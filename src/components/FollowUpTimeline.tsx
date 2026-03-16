@@ -12,7 +12,7 @@ interface Props {
 export function FollowUpTimeline({ followUps, status, compact = false }: Props) {
   if (compact) {
     return (
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1">
         {followUps.map((fu, i) => {
           const hasDate = !!fu.date && fu.date !== '-';
           const hasComment = !!fu.comment && fu.comment !== '-';
@@ -20,39 +20,44 @@ export function FollowUpTimeline({ followUps, status, compact = false }: Props) 
           const overdue = hasDate && isOverdue(fu.date, status) && !hasComment;
           const missing = isMissingFeedback(fu);
 
-          let iconEl: React.ReactNode;
-          let bgClass = '';
+          let ringClass = 'border-border/40 bg-muted/30';
+          let iconEl: React.ReactNode = <Minus className="h-2.5 w-2.5 text-muted-foreground/30" />;
 
           if (completed) {
-            bgClass = 'bg-accent-converted/15 text-accent-converted';
-            iconEl = <Check className="h-2.5 w-2.5" />;
+            ringClass = 'border-accent-converted/40 bg-accent-converted/10';
+            iconEl = <Check className="h-2.5 w-2.5 text-accent-converted" />;
           } else if (overdue) {
-            bgClass = 'bg-accent-overdue/15 text-accent-overdue animate-pulse-overdue';
-            iconEl = <AlertCircle className="h-2.5 w-2.5" />;
+            ringClass = 'border-accent-overdue/40 bg-accent-overdue/10 animate-pulse-overdue';
+            iconEl = <AlertCircle className="h-2.5 w-2.5 text-accent-overdue" />;
           } else if (missing) {
-            bgClass = 'bg-accent-warning/15 text-accent-warning';
-            iconEl = <Clock className="h-2.5 w-2.5" />;
+            ringClass = 'border-accent-warning/40 bg-accent-warning/10';
+            iconEl = <Clock className="h-2.5 w-2.5 text-accent-warning" />;
           } else if (hasDate) {
-            bgClass = 'bg-accent-info/15 text-accent-info';
-            iconEl = <Clock className="h-2.5 w-2.5" />;
-          } else {
-            bgClass = 'bg-muted/50 text-muted-foreground/40';
-            iconEl = <Minus className="h-2.5 w-2.5" />;
+            ringClass = 'border-primary/30 bg-primary/8';
+            iconEl = <Clock className="h-2.5 w-2.5 text-primary" />;
           }
-
-          const tooltipContent = hasDate
-            ? `FU${fu.index}: ${fu.date}${hasComment ? ` — ${fu.comment.substring(0, 80)}${fu.comment.length > 80 ? '...' : ''}` : ' — No comment'}`
-            : `FU${fu.index}: Not scheduled`;
 
           return (
             <Tooltip key={i}>
               <TooltipTrigger asChild>
-                <div className={`h-6 w-6 rounded-md flex items-center justify-center ${bgClass} cursor-default`}>
+                <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center cursor-default transition-all hover:scale-110 ${ringClass}`}>
                   {iconEl}
                 </div>
               </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-[320px] text-xs leading-relaxed">
-                <p>{tooltipContent}</p>
+              <TooltipContent side="top" className="max-w-[360px] p-3 space-y-1.5">
+                <p className="text-xs font-semibold text-foreground">Follow Up {fu.index}</p>
+                {hasDate ? (
+                  <>
+                    <p className="text-[11px] text-muted-foreground font-mono">{fu.date}</p>
+                    {hasComment ? (
+                      <p className="text-[11px] text-foreground leading-relaxed border-t border-border/30 pt-1.5 mt-1.5">{fu.comment}</p>
+                    ) : (
+                      <p className="text-[11px] text-accent-warning italic">No feedback recorded</p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground italic">Not yet scheduled</p>
+                )}
               </TooltipContent>
             </Tooltip>
           );
@@ -81,7 +86,7 @@ export function FollowUpTimeline({ followUps, status, compact = false }: Props) 
         } else if (missing) {
           dotClass += 'bg-accent-warning';
         } else if (hasDate) {
-          dotClass += 'bg-accent-info';
+          dotClass += 'bg-primary';
         } else {
           dotClass += 'bg-border';
         }
@@ -96,12 +101,12 @@ export function FollowUpTimeline({ followUps, status, compact = false }: Props) 
                   {completed && <Check className="h-2 w-2 text-primary-foreground" />}
                 </div>
               </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-[320px] text-xs">
-                <p className="font-medium mb-0.5">Follow Up {fu.index}</p>
-                {hasDate && <p className="text-muted-foreground">{fu.date}</p>}
-                {hasComment && <p className="mt-1">{fu.comment}</p>}
-                {!hasDate && <p className="text-muted-foreground italic">Not scheduled</p>}
-                {hasDate && !hasComment && <p className="text-accent-warning italic">Missing feedback</p>}
+              <TooltipContent side="top" className="max-w-[360px] p-3 space-y-1.5">
+                <p className="text-xs font-semibold text-foreground">Follow Up {fu.index}</p>
+                {hasDate && <p className="text-[11px] text-muted-foreground font-mono">{fu.date}</p>}
+                {hasComment && <p className="text-[11px] text-foreground leading-relaxed border-t border-border/30 pt-1.5 mt-1.5">{fu.comment}</p>}
+                {!hasDate && <p className="text-[11px] text-muted-foreground italic">Not scheduled</p>}
+                {hasDate && !hasComment && <p className="text-[11px] text-accent-warning italic">Missing feedback</p>}
               </TooltipContent>
             </Tooltip>
             {i < followUps.length - 1 && <div className={lineClass} />}

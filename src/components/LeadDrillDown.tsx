@@ -155,15 +155,13 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function StatusBadge({ label, type }: { label: string; type: 'success' | 'destructive' | 'default' | 'muted' | 'info' }) {
-  const cls: Record<string, string> = {
-    success: 'bg-accent-converted/10 text-accent-converted border-accent-converted/20',
-    destructive: 'bg-accent-overdue/10 text-accent-overdue border-accent-overdue/20',
-    default: 'bg-primary/8 text-primary border-primary/15',
-    info: 'bg-accent-info/10 text-accent-info border-accent-info/20',
-    muted: 'bg-muted text-muted-foreground border-border/50',
-  };
-  return <Badge variant="outline" className={`${cls[type]} text-[10px] font-medium rounded-md`}>{label}</Badge>;
+function StatusBadge({ label }: { label: string; type: string }) {
+  if (!label || label === '-') return null;
+  return (
+    <span className="inline-flex items-center justify-center h-6 px-3 rounded-md text-[10px] font-semibold gradient-primary text-primary-foreground shadow-sm whitespace-nowrap">
+      {label}
+    </span>
+  );
 }
 
 function MetricCard({ label, value, highlight, highlightDestructive }: { label: string; value: string; highlight?: boolean; highlightDestructive?: boolean }) {

@@ -1,17 +1,49 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useLeadsData } from '@/hooks/useLeadsData';
 import { LeadTable } from '@/components/LeadTable';
 import { LeadFilters } from '@/components/LeadFilters';
 import { AssociateOverview } from '@/components/AssociateOverview';
-import { defaultFilters } from '@/types/leads';
-import type { FilterState, ViewMode } from '@/types/leads';
+import { defaultFilters, parseDateStr, getDateRange } from '@/types/leads';
+import type { FilterState, ViewMode, Lead } from '@/types/leads';
 import { RefreshCw, LayoutList, Users, Loader2, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+
+function applyFilters(leads: Lead[], filters: FilterState): Lead[] {
+  const dateRange = getDateRange(filters.datePreset);
+
+  return leads.filter(l => {
+    if (filters.associate !== 'all' && l.associate !== filters.associate) return false;
+    if (filters.status !== 'all' && l.status !== filters.status) return false;
+    if (filters.center !== 'all' && l.center !== filters.center) return false;
+    if (filters.channel !== 'all' && l.channel !== filters.channel) return false;
+    if (filters.conversionStatus !== 'all' && l.conversionStatus !== filters.conversionStatus) return false;
+    if (filters.trialStatus !== 'all' && l.trialStatus !== filters.trialStatus) return false;
+
+    if (dateRange) {
+      const created = parseDateStr(l.createdAt);
+      if (!created || created < dateRange.from || created > dateRange.to) return false;
+    }
+
+    if (filters.search) {
+      const s = filters.search.toLowerCase();
+      if (
+        !l.fullName.toLowerCase().includes(s) &&
+        !l.email.toLowerCase().includes(s) &&
+        !l.phoneNumber.includes(s) &&
+        !l.id.includes(s) &&
+        !l.associate.toLowerCase().includes(s)
+      ) return false;
+    }
+    return true;
+  });
+}
 
 const Index = () => {
   const { data: leads = [], isLoading, error, refetch, isFetching } = useLeadsData();
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [view, setView] = useState<ViewMode>('table');
+
+  const filteredLeads = useMemo(() => applyFilters(leads, filters), [leads, filters]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -31,12 +63,13 @@ const Index = () => {
             <div>
               <h1 className="text-base font-bold text-foreground tracking-tight">Lead Pipeline</h1>
               {leads.length > 0 && (
-                <p className="text-[11px] text-muted-foreground">{leads.length} total leads</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {filteredLeads.length} of {leads.length} leads
+                </p>
               )}
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {/* View Toggle */}
             <div className="flex glass-panel rounded-xl p-1 shadow-sm">
               <button
                 onClick={() => setView('table')}
@@ -74,7 +107,6 @@ const Index = () => {
       </header>
 
       <main className="max-w-[1680px] mx-auto px-4 md:px-6 py-5 space-y-5 relative z-10">
-        {/* Error */}
         {error && (
           <div className="glass-strong rounded-2xl border border-accent-overdue/20 p-4 shadow-sm">
             <p className="text-sm text-accent-overdue">
@@ -83,7 +115,6 @@ const Index = () => {
           </div>
         )}
 
-        {/* Loading */}
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-32">
             <div className="h-12 w-12 rounded-2xl gradient-primary flex items-center justify-center shadow-lg mb-4">
@@ -93,16 +124,11 @@ const Index = () => {
           </div>
         )}
 
-        {/* Content */}
         {!isLoading && leads.length > 0 && (
           <>
-            {view === 'table' && (
-              <>
-                <LeadFilters filters={filters} onChange={setFilters} leads={leads} />
-                <LeadTable leads={leads} filters={filters} />
-              </>
-            )}
-            {view === 'associate' && <AssociateOverview leads={leads} />}
+            <LeadFilters filters={filters} onChange={setFilters} leads={leads} />
+            {view === 'table' && <LeadTable leads={filteredLeads} />}
+            {view === 'associate' && <AssociateOverview leads={filteredLeads} allLeads={leads} />}
           </>
         )}
 
