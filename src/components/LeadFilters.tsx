@@ -20,6 +20,7 @@ function getUnique(leads: Lead[], key: keyof Lead): string[] {
 const datePresets: { key: DatePreset; label: string }[] = [
   { key: 'all', label: 'All Time' },
   { key: '7days', label: 'Last 7 Days' },
+  { key: 'lastWeek', label: 'Last Week' },
   { key: 'thisWeek', label: 'This Week' },
   { key: 'thisMonth', label: 'This Month' },
   { key: 'lastMonth', label: 'Last Month' },

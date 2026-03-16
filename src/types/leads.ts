@@ -46,7 +46,7 @@ export interface AssociateStats {
 
 export type ViewMode = 'table' | 'associate';
 
-export type DatePreset = 'all' | '7days' | 'thisWeek' | 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'lastQuarter';
+export type DatePreset = 'all' | '7days' | 'lastWeek' | 'thisWeek' | 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'lastQuarter';
 
 export interface FilterState {
   associate: string;
@@ -99,6 +99,16 @@ export function getDateRange(preset: DatePreset): { from: Date; to: Date } | nul
       const from = new Date(today);
       from.setDate(from.getDate() - (day === 0 ? 6 : day - 1));
       return { from, to: today };
+    }
+    case 'lastWeek': {
+      const day = today.getDay();
+      const thisMonday = new Date(today);
+      thisMonday.setDate(thisMonday.getDate() - (day === 0 ? 6 : day - 1));
+      const lastMonday = new Date(thisMonday);
+      lastMonday.setDate(lastMonday.getDate() - 7);
+      const lastSunday = new Date(thisMonday);
+      lastSunday.setDate(lastSunday.getDate() - 1);
+      return { from: lastMonday, to: lastSunday };
     }
     case 'thisMonth': {
       return { from: new Date(today.getFullYear(), today.getMonth(), 1), to: today };
