@@ -8,18 +8,12 @@ export default {
     container: {
       center: true,
       padding: "2rem",
-      screens: {
-        "2xl": "1400px",
-      },
+      screens: { "2xl": "1400px" },
     },
     extend: {
       fontFamily: {
-        sans: ['Geist', 'system-ui', '-apple-system', 'sans-serif'],
-        mono: ['Geist Mono', 'ui-monospace', 'monospace'],
-      },
-      fontSize: {
-        'data': ['13px', '20px'],
-        'header': ['12px', '16px'],
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['SF Mono', 'Cascadia Code', 'ui-monospace', 'monospace'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -51,6 +45,7 @@ export default {
           converted: "hsl(var(--accent-converted))",
           warning: "hsl(var(--accent-warning))",
           info: "hsl(var(--accent-info))",
+          purple: "hsl(var(--accent-purple))",
         },
         popover: {
           DEFAULT: "hsl(var(--popover))",

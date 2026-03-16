@@ -44,7 +44,9 @@ export interface AssociateStats {
   totalLtv: number;
 }
 
-export type ViewMode = 'table' | 'associate' | 'kanban';
+export type ViewMode = 'table' | 'associate';
+
+export type DatePreset = 'all' | '7days' | 'thisWeek' | 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'lastQuarter';
 
 export interface FilterState {
   associate: string;
@@ -54,7 +56,7 @@ export interface FilterState {
   conversionStatus: string;
   trialStatus: string;
   search: string;
-  dateRange: { from: string; to: string };
+  datePreset: DatePreset;
 }
 
 export const defaultFilters: FilterState = {
@@ -65,5 +67,57 @@ export const defaultFilters: FilterState = {
   conversionStatus: 'all',
   trialStatus: 'all',
   search: '',
-  dateRange: { from: '', to: '' },
+  datePreset: 'all',
 };
+
+export function parseDateStr(dateStr: string): Date | null {
+  if (!dateStr || dateStr === '-') return null;
+  // Try DD/MM/YYYY
+  const parts = dateStr.split('/');
+  if (parts.length === 3) {
+    const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+    if (!isNaN(d.getTime())) return d;
+  }
+  // Try YYYY-MM-DD
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+export function getDateRange(preset: DatePreset): { from: Date; to: Date } | null {
+  if (preset === 'all') return null;
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  switch (preset) {
+    case '7days': {
+      const from = new Date(today);
+      from.setDate(from.getDate() - 7);
+      return { from, to: today };
+    }
+    case 'thisWeek': {
+      const day = today.getDay();
+      const from = new Date(today);
+      from.setDate(from.getDate() - (day === 0 ? 6 : day - 1));
+      return { from, to: today };
+    }
+    case 'thisMonth': {
+      return { from: new Date(today.getFullYear(), today.getMonth(), 1), to: today };
+    }
+    case 'lastMonth': {
+      const from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const to = new Date(today.getFullYear(), today.getMonth(), 0);
+      return { from, to };
+    }
+    case 'thisQuarter': {
+      const qStart = Math.floor(today.getMonth() / 3) * 3;
+      return { from: new Date(today.getFullYear(), qStart, 1), to: today };
+    }
+    case 'lastQuarter': {
+      const qStart = Math.floor(today.getMonth() / 3) * 3;
+      const from = new Date(today.getFullYear(), qStart - 3, 1);
+      const to = new Date(today.getFullYear(), qStart, 0);
+      return { from, to };
+    }
+    default: return null;
+  }
+}
