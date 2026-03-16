@@ -5,7 +5,7 @@ import { LeadFilters } from '@/components/LeadFilters';
 import { AssociateOverview } from '@/components/AssociateOverview';
 import { defaultFilters } from '@/types/leads';
 import type { FilterState, ViewMode } from '@/types/leads';
-import { RefreshCw, LayoutList, Users, Loader2 } from 'lucide-react';
+import { RefreshCw, LayoutList, Users, Loader2, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const Index = () => {
@@ -15,43 +15,56 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Decorative gradient orbs */}
+      <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden z-0">
+        <div className="absolute -top-[300px] -right-[200px] w-[600px] h-[600px] rounded-full bg-primary/5 blur-[120px]" />
+        <div className="absolute -bottom-[200px] -left-[200px] w-[500px] h-[500px] rounded-full bg-accent-purple/5 blur-[120px]" />
+      </div>
+
       {/* Top Bar */}
-      <header className="sticky top-0 z-30 bg-card/80 backdrop-blur-sm border-b border-border">
-        <div className="max-w-[1600px] mx-auto px-4 md:px-6 h-14 flex items-center justify-between">
+      <header className="sticky top-0 z-30 glass-strong border-b border-border/30">
+        <div className="max-w-[1680px] mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h1 className="text-heading text-lg">Lead Pipeline</h1>
-            {leads.length > 0 && (
-              <span className="text-data text-muted-foreground">
-                {leads.length} total
-              </span>
-            )}
+            <div className="h-9 w-9 rounded-xl gradient-primary flex items-center justify-center shadow-sm">
+              <Zap className="h-4.5 w-4.5 text-primary-foreground" />
+            </div>
+            <div>
+              <h1 className="text-base font-bold text-foreground tracking-tight">Lead Pipeline</h1>
+              {leads.length > 0 && (
+                <p className="text-[11px] text-muted-foreground">{leads.length} total leads</p>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {/* View Toggle */}
-            <div className="flex bg-surface rounded-lg p-0.5">
-              <Button
-                variant="ghost"
-                size="sm"
+            <div className="flex glass-panel rounded-xl p-1 shadow-sm">
+              <button
                 onClick={() => setView('table')}
-                className={`h-7 px-2.5 rounded-md text-data gap-1 ${view === 'table' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground'}`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  view === 'table'
+                    ? 'gradient-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
               >
                 <LayoutList className="h-3.5 w-3.5" /> Table
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
+              </button>
+              <button
                 onClick={() => setView('associate')}
-                className={`h-7 px-2.5 rounded-md text-data gap-1 ${view === 'associate' ? 'bg-card shadow-sm text-foreground' : 'text-muted-foreground'}`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  view === 'associate'
+                    ? 'gradient-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
               >
                 <Users className="h-3.5 w-3.5" /> Associates
-              </Button>
+              </button>
             </div>
             <Button
               variant="outline"
               size="sm"
               onClick={() => refetch()}
               disabled={isFetching}
-              className="h-8 gap-1.5 text-data"
+              className="h-9 gap-1.5 text-xs rounded-xl border-border/50 hover:bg-primary/5 hover:border-primary/30"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? 'animate-spin' : ''}`} />
               Refresh
@@ -60,11 +73,11 @@ const Index = () => {
         </div>
       </header>
 
-      <main className="max-w-[1600px] mx-auto px-4 md:px-6 py-4 space-y-4">
+      <main className="max-w-[1680px] mx-auto px-4 md:px-6 py-5 space-y-5 relative z-10">
         {/* Error */}
         {error && (
-          <div className="shadow-card rounded-xl bg-accent-overdue/5 border border-accent-overdue/20 p-4">
-            <p className="text-data text-accent-overdue">
+          <div className="glass-strong rounded-2xl border border-accent-overdue/20 p-4 shadow-sm">
+            <p className="text-sm text-accent-overdue">
               {error instanceof Error ? error.message : 'Connection to Google Sheets interrupted. Retrying...'}
             </p>
           </div>
@@ -72,9 +85,11 @@ const Index = () => {
 
         {/* Loading */}
         {isLoading && (
-          <div className="flex items-center justify-center py-24">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            <span className="ml-2 text-data text-muted-foreground">Loading leads from Google Sheets...</span>
+          <div className="flex flex-col items-center justify-center py-32">
+            <div className="h-12 w-12 rounded-2xl gradient-primary flex items-center justify-center shadow-lg mb-4">
+              <Loader2 className="h-5 w-5 animate-spin text-primary-foreground" />
+            </div>
+            <p className="text-sm text-muted-foreground">Loading leads from Google Sheets...</p>
           </div>
         )}
 
@@ -92,8 +107,11 @@ const Index = () => {
         )}
 
         {!isLoading && !error && leads.length === 0 && (
-          <div className="flex items-center justify-center py-24">
-            <p className="text-data text-muted-foreground">No leads found. Check your Google Sheets connection.</p>
+          <div className="flex flex-col items-center justify-center py-32">
+            <div className="h-12 w-12 rounded-2xl bg-muted flex items-center justify-center mb-4">
+              <Users className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <p className="text-sm text-muted-foreground">No leads found. Check your Google Sheets connection.</p>
           </div>
         )}
       </main>
