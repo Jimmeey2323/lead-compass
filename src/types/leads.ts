@@ -46,7 +46,7 @@ export interface AssociateStats {
 
 export type ViewMode = 'table' | 'associate';
 
-export type DatePreset = 'all' | '7days' | 'thisWeek' | 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'lastQuarter';
+export type DatePreset = 'all' | '7days' | 'lastWeek' | 'thisWeek' | 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'lastQuarter';
 
 export interface FilterState {
   associate: string;
