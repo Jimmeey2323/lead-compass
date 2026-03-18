@@ -1,7 +1,7 @@
 import type { FollowUp } from '@/types/leads';
 import { isOverdue, isMissingFeedback } from '@/hooks/useLeadsData';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Check, AlertCircle, Clock, Minus } from 'lucide-react';
+import { Check, AlertCircle, Clock3, CircleDashed } from 'lucide-react';
 
 interface Props {
   followUps: FollowUp[];
@@ -12,7 +12,7 @@ interface Props {
 export function FollowUpTimeline({ followUps, status, compact = false }: Props) {
   if (compact) {
     return (
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         {followUps.map((fu, i) => {
           const hasDate = !!fu.date && fu.date !== '-';
           const hasComment = !!fu.comment && fu.comment !== '-';
@@ -20,27 +20,27 @@ export function FollowUpTimeline({ followUps, status, compact = false }: Props) 
           const overdue = hasDate && isOverdue(fu.date, status) && !hasComment;
           const missing = isMissingFeedback(fu);
 
-          let ringClass = 'border-border/40 bg-muted/30';
-          let iconEl: React.ReactNode = <Minus className="h-2.5 w-2.5 text-muted-foreground/30" />;
+          let ringClass = 'border-slate-300/60 bg-slate-100 text-slate-400';
+          let iconEl: React.ReactNode = <CircleDashed className="h-3 w-3" />;
 
           if (completed) {
-            ringClass = 'border-accent-converted/40 bg-accent-converted/10';
-            iconEl = <Check className="h-2.5 w-2.5 text-accent-converted" />;
+            ringClass = 'border-emerald-300/70 bg-emerald-100 text-emerald-700';
+            iconEl = <Check className="h-3 w-3" />;
           } else if (overdue) {
-            ringClass = 'border-accent-overdue/40 bg-accent-overdue/10 animate-pulse-overdue';
-            iconEl = <AlertCircle className="h-2.5 w-2.5 text-accent-overdue" />;
+            ringClass = 'border-red-300/70 bg-red-100 text-red-700 animate-pulse-overdue';
+            iconEl = <AlertCircle className="h-3 w-3" />;
           } else if (missing) {
-            ringClass = 'border-accent-warning/40 bg-accent-warning/10';
-            iconEl = <Clock className="h-2.5 w-2.5 text-accent-warning" />;
+            ringClass = 'border-amber-300/70 bg-amber-100 text-amber-700';
+            iconEl = <Clock3 className="h-3 w-3" />;
           } else if (hasDate) {
-            ringClass = 'border-primary/30 bg-primary/8';
-            iconEl = <Clock className="h-2.5 w-2.5 text-primary" />;
+            ringClass = 'border-blue-300/70 bg-blue-100 text-blue-700';
+            iconEl = <Clock3 className="h-3 w-3" />;
           }
 
           return (
             <Tooltip key={i}>
               <TooltipTrigger asChild>
-                <div className={`h-6 w-6 rounded-full border-2 flex items-center justify-center cursor-default transition-all hover:scale-110 ${ringClass}`}>
+                <div className={`flex h-6 w-6 items-center justify-center rounded-full border cursor-default transition-all hover:scale-110 ${ringClass}`}>
                   {iconEl}
                 </div>
               </TooltipTrigger>
@@ -80,7 +80,7 @@ export function FollowUpTimeline({ followUps, status, compact = false }: Props) 
         let lineClass = 'h-0.5 w-3 ';
 
         if (completed) {
-          dotClass += 'bg-accent-converted text-primary-foreground';
+          dotClass += 'bg-blue-950 text-blue-50';
         } else if (overdue) {
           dotClass += 'bg-accent-overdue animate-pulse-overdue';
         } else if (missing) {
@@ -91,7 +91,7 @@ export function FollowUpTimeline({ followUps, status, compact = false }: Props) 
           dotClass += 'bg-border';
         }
 
-        lineClass += completed ? 'bg-accent-converted' : 'bg-border';
+    lineClass += completed ? 'bg-blue-900' : 'bg-border';
 
         return (
           <div key={i} className="flex items-center gap-0.5">

@@ -14,6 +14,7 @@ export interface Lead {
   sourceName: string;
   memberId: string;
   convertedAt: string;
+  stageId: string;
   stageName: string;
   associate: string;
   remarks: string;
@@ -42,36 +43,82 @@ export interface AssociateStats {
   avgFollowUps: number;
   overdueFollowUps: number;
   totalLtv: number;
+  avgLtv: number;
+  avgVisits: number;
+  scheduledFollowUps: number;
+  closeRate: number;
+  centersCovered: number;
 }
 
-export type ViewMode = 'table' | 'associate';
+export type ViewMode = 'table' | 'compact' | 'stage-board' | 'center-board' | 'associate' | 'comparison';
 
-export type DatePreset = 'all' | '7days' | 'lastWeek' | 'thisWeek' | 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'lastQuarter';
+export type GroupableLeadKey =
+  | 'fullName'
+  | 'createdAt'
+  | 'createdWeek'
+  | 'createdMonth'
+  | 'createdQuarter'
+  | 'createdYear'
+  | 'associate'
+  | 'center'
+  | 'sourceName'
+  | 'stageName'
+  | 'status'
+  | 'remarks'
+  | 'channel'
+  | 'conversionStatus'
+  | 'trialStatus'
+  | 'classType';
+
+export interface LeadOptionSets {
+  associates: string[];
+  statuses: string[];
+  centers: string[];
+  channels: string[];
+  conversionStatuses: string[];
+  trialStatuses: string[];
+  sourceNames: string[];
+  stageNames: string[];
+}
+
+export type DatePreset = 'all' | '7days' | 'lastWeek' | 'thisWeek' | 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'lastQuarter' | 'thisYear' | 'lastYear' | 'custom';
 
 export interface FilterState {
   associate: string;
-  status: string;
+  status: string[];
+  stageName: string[];
   center: string;
-  channel: string;
-  conversionStatus: string;
-  trialStatus: string;
+  sourceName: string[];
+  channel: string[];
+  conversionStatus: string[];
+  trialStatus: string[];
   search: string;
   datePreset: DatePreset;
+  customDateFrom: string;
+  customDateTo: string;
 }
 
 export const defaultFilters: FilterState = {
   associate: 'all',
-  status: 'all',
+  status: [],
+  stageName: [],
   center: 'all',
-  channel: 'all',
-  conversionStatus: 'all',
-  trialStatus: 'all',
+  sourceName: [],
+  channel: [],
+  conversionStatus: [],
+  trialStatus: [],
   search: '',
   datePreset: 'all',
+  customDateFrom: '',
+  customDateTo: '',
 };
 
 export function parseDateStr(dateStr: string): Date | null {
   if (!dateStr || dateStr === '-') return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const isoDate = new Date(`${dateStr}T00:00:00`);
+    return isNaN(isoDate.getTime()) ? null : isoDate;
+  }
   // Try DD/MM/YYYY
   const parts = dateStr.split('/');
   if (parts.length === 3) {
@@ -83,7 +130,7 @@ export function parseDateStr(dateStr: string): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-export function getDateRange(preset: DatePreset): { from: Date; to: Date } | null {
+export function getDateRange(preset: DatePreset, customDateFrom?: string, customDateTo?: string): { from: Date; to: Date } | null {
   if (preset === 'all') return null;
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -127,6 +174,24 @@ export function getDateRange(preset: DatePreset): { from: Date; to: Date } | nul
       const from = new Date(today.getFullYear(), qStart - 3, 1);
       const to = new Date(today.getFullYear(), qStart, 0);
       return { from, to };
+    }
+    case 'thisYear': {
+      return { from: new Date(today.getFullYear(), 0, 1), to: today };
+    }
+    case 'lastYear': {
+      return {
+        from: new Date(today.getFullYear() - 1, 0, 1),
+        to: new Date(today.getFullYear() - 1, 11, 31),
+      };
+    }
+    case 'custom': {
+      const from = parseDateStr(customDateFrom ?? '');
+      const to = parseDateStr(customDateTo ?? '');
+      if (!from && !to) return null;
+      return {
+        from: from ?? new Date(2000, 0, 1),
+        to: to ?? today,
+      };
     }
     default: return null;
   }

@@ -1,18 +1,114 @@
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, Phone, Mail, MessageSquare, ArrowRight, ExternalLink } from 'lucide-react';
+import { X, Phone, Mail, MessageSquare, ArrowRight, Save, Pencil, RotateCcw } from 'lucide-react';
 import type { Lead, AssociateStats } from '@/types/leads';
+import type { LeadOptionSets } from '@/types/leads';
 import { FollowUpTimeline } from './FollowUpTimeline';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { buildSourceIdMap, normalizeCenterName, normalizePersonName } from '@/lib/lead-utils';
+import { LeadSourceBadge, LeadStageBadge, LeadStatusBadge } from './LeadDisplay';
+import { buildMomencePayload, useUpdateLead } from '@/hooks/useLeadsData';
+import { toast } from '@/components/ui/sonner';
 
 interface Props {
   lead: Lead;
+  allLeads: Lead[];
+  options: LeadOptionSets;
   associateStats?: AssociateStats;
   onClose: () => void;
 }
 
-export function LeadDrillDown({ lead, associateStats, onClose }: Props) {
+export function LeadDrillDown({ lead, allLeads, options, associateStats, onClose }: Props) {
   const conversionPath = [lead.sourceName, lead.stageName, lead.conversionStatus].filter(Boolean);
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState<Lead>(lead);
+  const updateLead = useUpdateLead();
+
+  useEffect(() => {
+    setDraft(lead);
+    setIsEditing(false);
+  }, [lead]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  const sourceIdMap = useMemo(() => buildSourceIdMap(allLeads), [allLeads]);
+  const stageIdMap = useMemo(() => {
+    return allLeads.reduce<Record<string, string>>((acc, item) => {
+      if (item.stageName && item.stageId) {
+        acc[item.stageName] = item.stageId;
+      }
+      return acc;
+    }, {});
+  }, [allLeads]);
+
+  const setField = <K extends keyof Lead>(key: K, value: Lead[K]) => {
+    setDraft((current) => ({ ...current, [key]: value }));
+  };
+
+  const setFollowUpField = (index: number, key: 'date' | 'comment', value: string) => {
+    setDraft((current) => ({
+      ...current,
+      followUps: current.followUps.map((followUp) =>
+        followUp.index === index ? { ...followUp, [key]: value } : followUp,
+      ),
+    }));
+  };
+
+  const resetDraft = () => setDraft(lead);
+
+  const handleSave = async () => {
+    const mappedSourceId = sourceIdMap[draft.sourceName];
+    const fallbackSourceId = Number(draft.sourceId || lead.sourceId || 0);
+    const resolvedSourceId = Number.isFinite(mappedSourceId)
+      ? mappedSourceId
+      : (Number.isFinite(fallbackSourceId) ? fallbackSourceId : 0);
+    const resolvedStageId = draft.stageName === lead.stageName
+      ? (draft.stageId || lead.stageId)
+      : (stageIdMap[draft.stageName] ?? draft.stageId);
+
+    if (!resolvedSourceId) {
+      toast.error('Missing source mapping', {
+        description: 'Please choose a source that already exists in the imported lead data so the correct sourceId can be sent to Momence.',
+      });
+      return;
+    }
+
+    if (draft.stageName !== lead.stageName && !resolvedStageId) {
+      toast.error('Missing stage mapping', {
+        description: 'This stage does not yet have a known stageId in the imported data, so it cannot be updated safely.',
+      });
+      return;
+    }
+
+    try {
+      await updateLead.mutateAsync({
+        leadId: lead.id,
+        payload: buildMomencePayload(
+          { ...lead, sourceId: String(resolvedSourceId), stageId: String(resolvedStageId ?? '') },
+          { ...draft, sourceId: String(resolvedSourceId), stageId: String(resolvedStageId ?? '') },
+        ),
+      });
+
+      toast.success('Lead updated in Momence', {
+        description: `${normalizePersonName(draft.fullName)} has been synced successfully.`,
+      });
+      setIsEditing(false);
+    } catch (error) {
+      const description = error instanceof Error ? error.message : 'An unexpected error occurred while saving this lead.';
+      toast.error('Unable to save lead', { description });
+    }
+  };
 
   return (
     <motion.div
@@ -20,18 +116,23 @@ export function LeadDrillDown({ lead, associateStats, onClose }: Props) {
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: '100%', opacity: 0 }}
       transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-      className="fixed top-0 right-0 h-full w-full md:w-[500px] glass-strong shadow-elevated z-50 overflow-y-auto"
+      className="fixed right-0 top-16 z-[90] h-[calc(100vh-4rem)] w-full overflow-y-auto glass-strong shadow-elevated md:w-[640px]"
     >
       {/* Header */}
       <div className="sticky top-0 z-10 gradient-header p-5 text-primary-foreground">
         <div className="flex items-start justify-between">
           <div>
-            <h2 className="text-lg font-bold">{lead.fullName}</h2>
+            <h2 className="text-lg font-bold">{draft.fullName}</h2>
             <p className="text-sm opacity-80 font-mono mt-0.5">ID: {lead.id}</p>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0 text-primary-foreground hover:bg-primary-foreground/10">
-            <X className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setIsEditing((current) => !current)} className="h-8 px-2.5 text-primary-foreground hover:bg-primary-foreground/10">
+              <Pencil className="h-4 w-4 mr-1.5" /> {isEditing ? 'Preview' : 'Edit'}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0 text-primary-foreground hover:bg-primary-foreground/10">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         <div className="flex gap-2 mt-4">
           <Button size="sm" className="gap-1.5 text-xs bg-primary-foreground/15 hover:bg-primary-foreground/25 text-primary-foreground border-0 rounded-lg">
@@ -49,10 +150,10 @@ export function LeadDrillDown({ lead, associateStats, onClose }: Props) {
       <div className="p-5 space-y-6">
         {/* Status Badges */}
         <div className="flex flex-wrap gap-2">
-          <StatusBadge label={lead.status} type={lead.status === 'Lost' ? 'destructive' : lead.status.includes('Trial') ? 'info' : 'default'} />
-          <StatusBadge label={lead.conversionStatus} type={lead.conversionStatus === 'Converted' ? 'success' : 'muted'} />
-          <StatusBadge label={lead.trialStatus} type={lead.trialStatus === 'Trial Completed' ? 'success' : 'muted'} />
-          <StatusBadge label={lead.retentionStatus} type={lead.retentionStatus === 'Retained' ? 'success' : 'muted'} />
+          <LeadStatusBadge label={draft.status} />
+          <LeadStageBadge label={draft.stageName} />
+          <LeadSourceBadge label={draft.sourceName} />
+          <LeadStatusBadge label={draft.conversionStatus} />
         </div>
 
         {/* Key Metrics */}
@@ -74,19 +175,121 @@ export function LeadDrillDown({ lead, associateStats, onClose }: Props) {
           </div>
         </Section>
 
+        {isEditing && (
+          <Section title="Editable lead fields">
+            <div className="space-y-4">
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-2xl border border-primary/20 bg-primary/[0.03] p-4">
+                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Identity</p>
+                  <div className="grid grid-cols-1 gap-3">
+                    <FormField label="Full name">
+                      <Input value={draft.fullName} onChange={(event) => setField('fullName', event.target.value)} />
+                    </FormField>
+                    <FormField label="Phone number">
+                      <Input value={draft.phoneNumber} onChange={(event) => setField('phoneNumber', event.target.value)} />
+                    </FormField>
+                    <FormField label="Email">
+                      <Input value={draft.email} onChange={(event) => setField('email', event.target.value)} />
+                    </FormField>
+                    <FormField label="Created date">
+                      <Input value={draft.createdAt} onChange={(event) => setField('createdAt', event.target.value)} />
+                    </FormField>
+                    <FormField label="Associate">
+                      <SelectField value={draft.associate} options={options.associates} onChange={(value) => setField('associate', value)} />
+                    </FormField>
+                    <FormField label="Center">
+                      <SelectField value={draft.center} options={options.centers} onChange={(value) => setField('center', value)} />
+                    </FormField>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-primary/20 bg-primary/[0.03] p-4">
+                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Pipeline</p>
+                  <div className="grid grid-cols-1 gap-3">
+                    <FormField label="Source">
+                      <SelectField value={draft.sourceName} options={options.sourceNames} onChange={(value) => setField('sourceName', value)} />
+                    </FormField>
+                    <FormField label="Stage">
+                      <SelectField value={draft.stageName} options={options.stageNames} onChange={(value) => setField('stageName', value)} />
+                    </FormField>
+                    <FormField label="Status">
+                      <SelectField value={draft.status} options={options.statuses} onChange={(value) => setField('status', value)} />
+                    </FormField>
+                    <FormField label="Channel">
+                      <SelectField value={draft.channel} options={options.channels} onChange={(value) => setField('channel', value)} />
+                    </FormField>
+                    <FormField label="Type">
+                      <Input value={draft.classType} onChange={(event) => setField('classType', event.target.value)} />
+                    </FormField>
+                    <FormField label="Conversion status">
+                      <SelectField value={draft.conversionStatus} options={options.conversionStatuses} onChange={(value) => setField('conversionStatus', value)} />
+                    </FormField>
+                    <FormField label="Trial status">
+                      <SelectField value={draft.trialStatus} options={options.trialStatuses} onChange={(value) => setField('trialStatus', value)} />
+                    </FormField>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-primary/20 bg-primary/[0.03] p-4">
+                <FormField label="Remarks">
+                  <textarea
+                    value={draft.remarks}
+                    onChange={(event) => setField('remarks', event.target.value)}
+                    className="min-h-[110px] w-full rounded-xl border border-border/40 bg-background/80 px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </FormField>
+              </div>
+
+              <div className="rounded-2xl border border-primary/20 bg-primary/[0.03] p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <p className="text-[11px] uppercase tracking-[0.18em] font-semibold text-muted-foreground">Follow-up planner</p>
+                  <p className="text-[11px] text-muted-foreground">Grid layout</p>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {draft.followUps.map((followUp) => (
+                    <div key={followUp.index} className="rounded-2xl border border-border/30 bg-background/70 p-3 shadow-sm">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-foreground">FU {followUp.index}</span>
+                        <span className="text-[10px] text-muted-foreground">Schedule + notes</span>
+                      </div>
+                      <div className="space-y-3">
+                        <Input value={followUp.date} onChange={(event) => setFollowUpField(followUp.index, 'date', event.target.value)} placeholder={`FU ${followUp.index} date`} />
+                        <Input value={followUp.comment} onChange={(event) => setFollowUpField(followUp.index, 'comment', event.target.value)} placeholder={`FU ${followUp.index} comment`} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" onClick={resetDraft} className="rounded-xl">
+                  <RotateCcw className="h-4 w-4 mr-1.5" /> Reset changes
+                </Button>
+                <Button type="button" onClick={handleSave} disabled={updateLead.isPending} className="rounded-xl gap-1.5">
+                  <Save className="h-4 w-4" /> {updateLead.isPending ? 'Saving…' : 'Save to Momence'}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Saves are sent securely through the backend using the configured <code>MOMENCE_ALL_COOKIES</code> secret. Source IDs are resolved from imported lead data, and stage IDs are used when available.
+              </p>
+            </div>
+          </Section>
+        )}
+
         {/* Contact Info */}
         <Section title="Contact Details">
           <div className="space-y-0">
-            <InfoRow label="Phone" value={lead.phoneNumber} mono />
-            <InfoRow label="Email" value={lead.email} />
-            <InfoRow label="Center" value={lead.center} />
-            <InfoRow label="Class Type" value={lead.classType} />
-            <InfoRow label="Channel" value={lead.channel} />
-            <InfoRow label="Associate" value={lead.associate} />
-            <InfoRow label="Source" value={lead.sourceName} />
-            <InfoRow label="Created" value={lead.createdAt} mono />
-            {lead.convertedAt && lead.convertedAt !== '-' && (
-              <InfoRow label="Converted" value={lead.convertedAt} mono />
+            <InfoRow label="Phone" value={draft.phoneNumber} mono />
+            <InfoRow label="Email" value={draft.email} />
+            <InfoRow label="Center" value={normalizeCenterName(draft.center)} />
+            <InfoRow label="Class Type" value={draft.classType} />
+            <InfoRow label="Channel" value={draft.channel} />
+            <InfoRow label="Associate" value={draft.associate} />
+            <InfoRow label="Source" value={draft.sourceName} />
+            <InfoRow label="Created" value={draft.createdAt} mono />
+            {draft.convertedAt && draft.convertedAt !== '-' && (
+              <InfoRow label="Converted" value={draft.convertedAt} mono />
             )}
           </div>
         </Section>
@@ -94,21 +297,21 @@ export function LeadDrillDown({ lead, associateStats, onClose }: Props) {
         {/* Remarks */}
         <Section title="Remarks">
           <p className={`text-sm p-3.5 rounded-xl leading-relaxed ${
-            !lead.remarks || lead.remarks === '-'
+            !draft.remarks || draft.remarks === '-'
               ? 'bg-accent-warning/8 text-accent-warning border border-accent-warning/15 italic'
               : 'bg-surface/80 text-foreground border border-border/30'
           }`}>
-            {lead.remarks && lead.remarks !== '-' ? lead.remarks : 'No remarks added'}
+            {draft.remarks && draft.remarks !== '-' ? draft.remarks : 'No remarks added'}
           </p>
         </Section>
 
         {/* Follow-up Timeline */}
         <Section title="Follow-up History">
           <div className="mb-4">
-            <FollowUpTimeline followUps={lead.followUps} status={lead.status} />
+            <FollowUpTimeline followUps={draft.followUps} status={draft.status} />
           </div>
-          <div className="space-y-2.5">
-            {lead.followUps.map((fu) => {
+          <div className="grid gap-3 md:grid-cols-2">
+            {draft.followUps.map((fu) => {
               const hasDate = !!fu.date && fu.date !== '-';
               const hasComment = !!fu.comment && fu.comment !== '-';
               return (
@@ -133,10 +336,15 @@ export function LeadDrillDown({ lead, associateStats, onClose }: Props) {
         {/* Associate Benchmark */}
         {associateStats && (
           <Section title="Associate Performance">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
               <MetricCard label="Total Leads" value={String(associateStats.totalLeads)} />
               <MetricCard label="Conv. Rate" value={`${associateStats.conversionRate.toFixed(1)}%`} highlight={associateStats.conversionRate > 20} />
+              <MetricCard label="Close Rate" value={`${associateStats.closeRate.toFixed(1)}%`} highlight={associateStats.closeRate > 25} />
               <MetricCard label="Avg Follow-ups" value={associateStats.avgFollowUps.toFixed(1)} />
+              <MetricCard label="Scheduled FUs" value={String(associateStats.scheduledFollowUps)} />
+              <MetricCard label="Avg Visits" value={associateStats.avgVisits.toFixed(1)} />
+              <MetricCard label="Avg LTV" value={`₹${associateStats.avgLtv.toLocaleString(undefined, { maximumFractionDigits: 0 })}`} />
+              <MetricCard label="Centers" value={String(associateStats.centersCovered)} />
               <MetricCard label="Overdue" value={String(associateStats.overdueFollowUps)} highlight={associateStats.overdueFollowUps > 0} highlightDestructive />
             </div>
           </Section>
@@ -148,19 +356,14 @@ export function LeadDrillDown({ lead, associateStats, onClose }: Props) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div>
-      <h3 className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-3">{title}</h3>
-      {children}
-    </div>
-  );
-}
-
-function StatusBadge({ label }: { label: string; type: string }) {
-  if (!label || label === '-') return null;
-  return (
-    <span className="inline-flex items-center justify-center h-6 px-3 rounded-md text-[10px] font-semibold gradient-primary text-primary-foreground shadow-sm whitespace-nowrap">
-      {label}
-    </span>
+    <section className="overflow-hidden rounded-2xl border border-border/30 bg-white/70 shadow-card">
+      <div className="border-b border-border/30 px-4 py-3">
+        <h3 className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">{title}</h3>
+      </div>
+      <div className="p-4">
+        {children}
+      </div>
+    </section>
   );
 }
 
@@ -181,5 +384,30 @@ function InfoRow({ label, value, mono }: { label: string; value: string; mono?: 
       <span className="text-xs text-muted-foreground">{label}</span>
       <span className={`text-sm text-foreground ${mono ? 'font-mono' : ''}`}>{value || '—'}</span>
     </div>
+  );
+}
+
+function FormField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function SelectField({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) {
+  const uniqueOptions = useMemo(() => Array.from(new Set([value, ...options].filter(Boolean))), [options, value]);
+
+  return (
+    <select
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      className="h-10 w-full rounded-xl border border-border/40 bg-background/80 px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/20"
+    >
+      {uniqueOptions.map((option) => (
+        <option key={option} value={option}>{option}</option>
+      ))}
+    </select>
   );
 }
