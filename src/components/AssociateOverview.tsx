@@ -16,6 +16,10 @@ interface Props {
 
 type AssociateSortKey = keyof Pick<AssociateStats, 'name' | 'totalLeads' | 'converted' | 'lost' | 'active' | 'conversionRate' | 'closeRate' | 'avgFollowUps' | 'scheduledFollowUps' | 'avgVisits' | 'avgLtv' | 'centersCovered' | 'overdueFollowUps' | 'totalLtv'>;
 
+function isLostLead(lead: Lead): boolean {
+  return /lost|not interested|lead dropped|dropped|dead|cancel/i.test(`${lead.status} ${lead.stageName}`);
+}
+
 export function computeAssociateStats(leads: Lead[]): AssociateStats[] {
   const map = new Map<string, Lead[]>();
   leads.forEach(l => {
@@ -26,8 +30,8 @@ export function computeAssociateStats(leads: Lead[]): AssociateStats[] {
 
   return Array.from(map.entries()).map(([name, aLeads]) => {
     const converted = aLeads.filter(l => l.conversionStatus === 'Converted').length;
-    const lost = aLeads.filter(l => l.status === 'Lost').length;
-    const active = aLeads.filter(l => l.status !== 'Lost' && l.conversionStatus !== 'Converted').length;
+    const lost = aLeads.filter(isLostLead).length;
+    const active = aLeads.filter(l => !isLostLead(l) && l.conversionStatus !== 'Converted').length;
     const totalFollowUps = aLeads.reduce((sum, l) => sum + l.followUps.filter(f => f.date && f.date !== '-').length, 0);
     const overdueFollowUps = aLeads.reduce((sum, l) => sum + l.followUps.filter(f => isOverdue(f.date, l.status)).length, 0);
     const totalLtv = aLeads.reduce((sum, l) => sum + l.ltv, 0);
@@ -60,7 +64,7 @@ export function AssociateOverview({ leads, allLeads, options }: Props) {
   const totalLeads = leads.length;
   const needsAction = leads.filter(l => l.followUps.some(f => isOverdue(f.date, l.status))).length;
   const totalConverted = leads.filter(l => l.conversionStatus === 'Converted').length;
-  const totalLost = leads.filter(l => l.status === 'Lost').length;
+  const totalLost = leads.filter(isLostLead).length;
   const overallConvRate = totalLeads > 0 ? ((totalConverted / totalLeads) * 100).toFixed(1) : '0';
   const totalRevenue = leads.reduce((sum, lead) => sum + lead.ltv, 0);
   const avgVisits = totalLeads > 0 ? (leads.reduce((sum, lead) => sum + lead.visits, 0) / totalLeads).toFixed(1) : '0.0';
