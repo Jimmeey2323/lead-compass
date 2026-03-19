@@ -10,6 +10,14 @@ import {
   splitFullName,
 } from '@/lib/lead-utils';
 
+const LEADS_CACHE_KEY = 'lead-compass:leads:v1';
+const LEADS_CACHE_MAX_AGE_MS = 30 * 60 * 1000;
+
+interface LeadsCacheEntry {
+  timestamp: number;
+  leads: Lead[];
+}
+
 export interface LeadUpdatePayload {
   leadId: string;
   payload: Record<string, unknown>;
@@ -71,6 +79,47 @@ function parseRow(row: string[]): Lead {
   };
 }
 
+function readCachedLeads(): LeadsCacheEntry | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = window.localStorage.getItem(LEADS_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as Partial<LeadsCacheEntry>;
+    if (!Array.isArray(parsed.leads) || typeof parsed.timestamp !== 'number') {
+      return null;
+    }
+
+    if (Date.now() - parsed.timestamp > LEADS_CACHE_MAX_AGE_MS) {
+      window.localStorage.removeItem(LEADS_CACHE_KEY);
+      return null;
+    }
+
+    return {
+      timestamp: parsed.timestamp,
+      leads: parsed.leads as Lead[],
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedLeads(leads: Lead[]) {
+  if (typeof window === 'undefined') return;
+
+  const entry: LeadsCacheEntry = {
+    timestamp: Date.now(),
+    leads,
+  };
+
+  try {
+    window.localStorage.setItem(LEADS_CACHE_KEY, JSON.stringify(entry));
+  } catch {
+    // Ignore storage quota/private mode failures.
+  }
+}
+
 async function fetchLeads(): Promise<Lead[]> {
   const { data, error } = await supabase.functions.invoke('fetch-leads');
   if (error) throw error;
@@ -78,18 +127,28 @@ async function fetchLeads(): Promise<Lead[]> {
   const rows: string[][] = data.values || [];
   // Skip header row
   if (rows.length <= 1) return [];
-  return rows
+  const leads = rows
     .slice(1)
     .filter((row) => isValidLeadName(row[1] || ''))
     .map(parseRow);
+
+  writeCachedLeads(leads);
+  return leads;
 }
 
 export function useLeadsData() {
+  const cachedLeads = readCachedLeads();
+
   return useQuery({
     queryKey: ['leads'],
     queryFn: fetchLeads,
-    staleTime: 5 * 60 * 1000,
-    retry: 2,
+    initialData: cachedLeads?.leads,
+    initialDataUpdatedAt: cachedLeads?.timestamp,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: 1,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 }
 
@@ -111,6 +170,9 @@ export function useUpdateLead() {
   return useMutation({
     mutationFn: updateLead,
     onSuccess: () => {
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(LEADS_CACHE_KEY);
+      }
       queryClient.invalidateQueries({ queryKey: ['leads'] });
     },
   });

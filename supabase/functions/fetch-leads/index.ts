@@ -7,9 +7,18 @@ const corsHeaders = {
 
 const SHEET_ID = '1dQMNF69WnXVQdhlLvUZTig3kL97NA21k6eZ9HRu6xiQ';
 const SHEET_NAME = '◉ Leads';
-const SCOPES = 'https://www.googleapis.com/auth/spreadsheets.readonly';
+const SHEET_RANGE = `${SHEET_NAME}!A:AG`;
+const SHEET_CACHE_TTL_MS = 2 * 60 * 1000;
+const TOKEN_EXPIRY_BUFFER_MS = 60 * 1000;
+
+let cachedAccessToken: { token: string; expiresAt: number } | null = null;
+let cachedSheetPayload: { data: unknown; expiresAt: number } | null = null;
 
 async function getAccessToken(): Promise<string> {
+  if (cachedAccessToken && cachedAccessToken.expiresAt > Date.now()) {
+    return cachedAccessToken.token;
+  }
+
   const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
   const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
   const refreshToken = Deno.env.get('GOOGLE_REFRESH_TOKEN');
@@ -35,7 +44,12 @@ async function getAccessToken(): Promise<string> {
   }
 
   const data = await response.json();
-  return data.access_token;
+  cachedAccessToken = {
+    token: data.access_token,
+    expiresAt: Date.now() + Math.max((Number(data.expires_in) || 3600) * 1000 - TOKEN_EXPIRY_BUFFER_MS, 0),
+  };
+
+  return cachedAccessToken.token;
 }
 
 Deno.serve(async (req) => {
@@ -44,9 +58,20 @@ Deno.serve(async (req) => {
   }
 
   try {
+    if (cachedSheetPayload && cachedSheetPayload.expiresAt > Date.now()) {
+      return new Response(JSON.stringify(cachedSheetPayload.data), {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, max-age=120, stale-while-revalidate=300',
+          'X-Lead-Cache': 'HIT',
+        },
+      });
+    }
+
     const accessToken = await getAccessToken();
     
-    const encodedSheet = encodeURIComponent(SHEET_NAME);
+    const encodedSheet = encodeURIComponent(SHEET_RANGE);
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodedSheet}`;
     
     const response = await fetch(url, {
@@ -59,9 +84,18 @@ Deno.serve(async (req) => {
     }
 
     const data = await response.json();
+    cachedSheetPayload = {
+      data,
+      expiresAt: Date.now() + SHEET_CACHE_TTL_MS,
+    };
 
     return new Response(JSON.stringify(data), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=120, stale-while-revalidate=300',
+        'X-Lead-Cache': 'MISS',
+      },
     });
   } catch (error) {
     console.error('Error fetching leads:', error);
