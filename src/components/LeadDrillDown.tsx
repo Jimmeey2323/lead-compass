@@ -16,10 +16,11 @@ interface Props {
   allLeads: Lead[];
   options: LeadOptionSets;
   associateStats?: AssociateStats;
+  fullscreen?: boolean;
   onClose: () => void;
 }
 
-export function LeadDrillDown({ lead, allLeads, options, associateStats, onClose }: Props) {
+export function LeadDrillDown({ lead, allLeads, options, associateStats, fullscreen = false, onClose }: Props) {
   const conversionPath = [lead.sourceName, lead.stageName, lead.conversionStatus].filter(Boolean);
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState<Lead>(lead);
@@ -116,7 +117,7 @@ export function LeadDrillDown({ lead, allLeads, options, associateStats, onClose
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: '100%', opacity: 0 }}
       transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-      className="fixed right-0 top-16 z-[90] h-[calc(100vh-4rem)] w-full overflow-y-auto glass-strong shadow-elevated md:w-[640px]"
+      className={`fixed right-0 z-[90] w-full overflow-y-auto glass-strong shadow-elevated md:w-[640px] ${fullscreen ? 'top-0 h-screen' : 'top-16 h-[calc(100vh-4rem)]'}`}
     >
       {/* Header */}
       <div className="sticky top-0 z-10 gradient-header p-5 text-primary-foreground">
