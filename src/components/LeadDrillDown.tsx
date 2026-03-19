@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import { X, Phone, Mail, MessageSquare, ArrowRight, Save, Pencil, RotateCcw } from 'lucide-react';
 import type { Lead, AssociateStats } from '@/types/leads';
 import type { LeadOptionSets } from '@/types/leads';
@@ -7,7 +8,6 @@ import { FollowUpTimeline } from './FollowUpTimeline';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { buildSourceIdMap, normalizeCenterName, normalizePersonName } from '@/lib/lead-utils';
-import { LeadSourceBadge, LeadStageBadge, LeadStatusBadge } from './LeadDisplay';
 import { buildMomencePayload, useUpdateLead } from '@/hooks/useLeadsData';
 import { toast } from '@/components/ui/sonner';
 
@@ -111,50 +111,51 @@ export function LeadDrillDown({ lead, allLeads, options, associateStats, fullscr
     }
   };
 
-  return (
+  const content = (
     <motion.div
       initial={{ x: '100%', opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: '100%', opacity: 0 }}
       transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-      className={`fixed right-0 z-[90] w-full overflow-y-auto glass-strong shadow-elevated md:w-[640px] ${fullscreen ? 'top-0 h-screen' : 'top-16 h-[calc(100vh-4rem)]'}`}
+      className="fixed right-0 top-0 z-[140] h-screen w-full overflow-y-auto border-l border-slate-300/70 bg-white shadow-elevated md:w-[640px]"
     >
       {/* Header */}
-      <div className="sticky top-0 z-10 gradient-header p-5 text-primary-foreground">
+      <div className="sticky top-0 z-10 bg-[linear-gradient(135deg,#0f172a,#13213b,#1e3a5f)] p-5 text-white">
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-lg font-bold">{draft.fullName}</h2>
-            <p className="text-sm opacity-80 font-mono mt-0.5">ID: {lead.id}</p>
+            <p className="mt-0.5 font-mono text-sm text-slate-200">ID: {lead.id}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setIsEditing((current) => !current)} className="h-8 px-2.5 text-primary-foreground hover:bg-primary-foreground/10">
+            <Button variant="ghost" size="sm" onClick={() => setIsEditing((current) => !current)} className="h-8 rounded-xl px-2.5 text-white hover:bg-white/10">
               <Pencil className="h-4 w-4 mr-1.5" /> {isEditing ? 'Preview' : 'Edit'}
             </Button>
-            <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0 text-primary-foreground hover:bg-primary-foreground/10">
+            <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 rounded-xl p-0 text-white hover:bg-white/10">
               <X className="h-4 w-4" />
             </Button>
           </div>
         </div>
         <div className="flex gap-2 mt-4">
-          <Button size="sm" className="gap-1.5 text-xs bg-primary-foreground/15 hover:bg-primary-foreground/25 text-primary-foreground border-0 rounded-lg">
+          <Button size="sm" className="gap-1.5 rounded-xl border border-white/10 bg-white/10 text-xs text-white hover:bg-white/15">
             <Phone className="h-3.5 w-3.5" /> Call
           </Button>
-          <Button size="sm" className="gap-1.5 text-xs bg-primary-foreground/15 hover:bg-primary-foreground/25 text-primary-foreground border-0 rounded-lg">
+          <Button size="sm" className="gap-1.5 rounded-xl border border-white/10 bg-white/10 text-xs text-white hover:bg-white/15">
             <Mail className="h-3.5 w-3.5" /> Email
           </Button>
-          <Button size="sm" className="gap-1.5 text-xs bg-primary-foreground/15 hover:bg-primary-foreground/25 text-primary-foreground border-0 rounded-lg">
+          <Button size="sm" className="gap-1.5 rounded-xl border border-white/10 bg-white/10 text-xs text-white hover:bg-white/15">
             <MessageSquare className="h-3.5 w-3.5" /> Message
           </Button>
         </div>
       </div>
 
-      <div className="p-5 space-y-6">
+      <div className="space-y-6 bg-slate-50 p-5">
         {/* Status Badges */}
         <div className="flex flex-wrap gap-2">
-          <LeadStatusBadge label={draft.status} />
-          <LeadStageBadge label={draft.stageName} />
-          <LeadSourceBadge label={draft.sourceName} />
-          <LeadStatusBadge label={draft.conversionStatus} />
+          {[draft.status, draft.stageName, draft.sourceName, draft.conversionStatus].filter(Boolean).map((label) => (
+            <span key={label} className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700">
+              {label}
+            </span>
+          ))}
         </div>
 
         {/* Key Metrics */}
@@ -169,7 +170,7 @@ export function LeadDrillDown({ lead, allLeads, options, associateStats, fullscr
           <div className="flex items-center gap-2 flex-wrap">
             {conversionPath.map((step, i) => (
               <div key={i} className="flex items-center gap-2">
-                <span className="text-xs bg-primary/5 text-foreground border border-primary/10 px-3 py-1.5 rounded-lg font-medium">{step}</span>
+                <span className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700">{step}</span>
                 {i < conversionPath.length - 1 && <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />}
               </div>
             ))}
@@ -180,7 +181,7 @@ export function LeadDrillDown({ lead, allLeads, options, associateStats, fullscr
           <Section title="Editable lead fields">
             <div className="space-y-4">
               <div className="grid gap-4 lg:grid-cols-2">
-                <div className="rounded-2xl border border-primary/20 bg-primary/[0.03] p-4">
+                <div className="rounded-2xl border border-slate-300 bg-white p-4">
                   <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Identity</p>
                   <div className="grid grid-cols-1 gap-3">
                     <FormField label="Full name">
@@ -204,7 +205,7 @@ export function LeadDrillDown({ lead, allLeads, options, associateStats, fullscr
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-primary/20 bg-primary/[0.03] p-4">
+                <div className="rounded-2xl border border-slate-300 bg-white p-4">
                   <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Pipeline</p>
                   <div className="grid grid-cols-1 gap-3">
                     <FormField label="Source">
@@ -232,24 +233,24 @@ export function LeadDrillDown({ lead, allLeads, options, associateStats, fullscr
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-primary/20 bg-primary/[0.03] p-4">
+              <div className="rounded-2xl border border-slate-300 bg-white p-4">
                 <FormField label="Remarks">
                   <textarea
                     value={draft.remarks}
                     onChange={(event) => setField('remarks', event.target.value)}
-                    className="min-h-[110px] w-full rounded-xl border border-border/40 bg-background/80 px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/20"
+                    className="min-h-[110px] w-full rounded-xl border border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-slate-300"
                   />
                 </FormField>
               </div>
 
-              <div className="rounded-2xl border border-primary/20 bg-primary/[0.03] p-4">
+              <div className="rounded-2xl border border-slate-300 bg-white p-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <p className="text-[11px] uppercase tracking-[0.18em] font-semibold text-muted-foreground">Follow-up planner</p>
                   <p className="text-[11px] text-muted-foreground">Grid layout</p>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   {draft.followUps.map((followUp) => (
-                    <div key={followUp.index} className="rounded-2xl border border-border/30 bg-background/70 p-3 shadow-sm">
+                    <div key={followUp.index} className="rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm">
                       <div className="mb-3 flex items-center justify-between gap-2">
                         <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-foreground">FU {followUp.index}</span>
                         <span className="text-[10px] text-muted-foreground">Schedule + notes</span>
@@ -264,10 +265,10 @@ export function LeadDrillDown({ lead, allLeads, options, associateStats, fullscr
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" onClick={resetDraft} className="rounded-xl">
+                <Button type="button" variant="outline" onClick={resetDraft} className="rounded-xl border-slate-300 bg-white text-slate-800 hover:bg-slate-100">
                   <RotateCcw className="h-4 w-4 mr-1.5" /> Reset changes
                 </Button>
-                <Button type="button" onClick={handleSave} disabled={updateLead.isPending} className="rounded-xl gap-1.5">
+                <Button type="button" onClick={handleSave} disabled={updateLead.isPending} className="rounded-xl gap-1.5 bg-slate-900 text-white hover:bg-slate-800">
                   <Save className="h-4 w-4" /> {updateLead.isPending ? 'Saving…' : 'Save to Momence'}
                 </Button>
               </div>
@@ -297,10 +298,10 @@ export function LeadDrillDown({ lead, allLeads, options, associateStats, fullscr
 
         {/* Remarks */}
         <Section title="Remarks">
-          <p className={`text-sm p-3.5 rounded-xl leading-relaxed ${
+          <p className={`rounded-xl border p-3.5 text-sm leading-relaxed ${
             !draft.remarks || draft.remarks === '-'
-              ? 'bg-accent-warning/8 text-accent-warning border border-accent-warning/15 italic'
-              : 'bg-surface/80 text-foreground border border-border/30'
+              ? 'border-slate-300 bg-slate-100 italic text-slate-500'
+              : 'border-slate-200 bg-white text-slate-900'
           }`}>
             {draft.remarks && draft.remarks !== '-' ? draft.remarks : 'No remarks added'}
           </p>
@@ -316,16 +317,16 @@ export function LeadDrillDown({ lead, allLeads, options, associateStats, fullscr
               const hasDate = !!fu.date && fu.date !== '-';
               const hasComment = !!fu.comment && fu.comment !== '-';
               return (
-                <div key={fu.index} className={`p-3.5 rounded-xl text-sm border ${
-                  !hasDate ? 'bg-muted/30 border-border/20 text-muted-foreground/50' :
-                  !hasComment ? 'bg-accent-warning/5 border-accent-warning/15' :
-                  'bg-surface/50 border-border/30'
+                <div key={fu.index} className={`rounded-xl border p-3.5 text-sm ${
+                  !hasDate ? 'border-slate-200 bg-slate-100 text-slate-400' :
+                  !hasComment ? 'border-slate-300 bg-white' :
+                  'border-slate-200 bg-white'
                 }`}>
                   <div className="flex justify-between items-center mb-1.5">
                     <span className="font-semibold text-foreground text-xs">Follow Up {fu.index}</span>
                     {hasDate && <span className="font-mono text-[11px] text-muted-foreground">{fu.date}</span>}
                   </div>
-                  <p className={`text-xs leading-relaxed ${!hasComment && hasDate ? 'text-accent-warning italic' : 'text-muted-foreground'}`}>
+                  <p className={`text-xs leading-relaxed ${!hasComment && hasDate ? 'italic text-slate-500' : 'text-muted-foreground'}`}>
                     {hasComment ? fu.comment : hasDate ? 'Missing feedback' : 'Not scheduled'}
                   </p>
                 </div>
@@ -353,13 +354,19 @@ export function LeadDrillDown({ lead, allLeads, options, associateStats, fullscr
       </div>
     </motion.div>
   );
+
+  if (typeof document === 'undefined') {
+    return content;
+  }
+
+  return createPortal(content, document.body);
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-border/30 bg-white/70 shadow-card">
-      <div className="border-b border-border/30 px-4 py-3">
-        <h3 className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground">{title}</h3>
+    <section className="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-card">
+      <div className="border-b border-slate-200 px-4 py-3">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{title}</h3>
       </div>
       <div className="p-4">
         {children}
@@ -370,20 +377,18 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function MetricCard({ label, value, highlight, highlightDestructive }: { label: string; value: string; highlight?: boolean; highlightDestructive?: boolean }) {
   return (
-    <div className={`p-3.5 rounded-xl border ${highlight ? (highlightDestructive ? 'bg-accent-overdue/5 border-accent-overdue/15' : 'bg-accent-converted/5 border-accent-converted/15') : 'bg-surface/50 border-border/30'}`}>
-      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">{label}</p>
-      <p className={`text-lg font-bold font-mono ${
-        highlight ? (highlightDestructive ? 'text-accent-overdue' : 'text-accent-converted') : 'text-foreground'
-      }`}>{value}</p>
+    <div className={`rounded-xl border p-3.5 ${highlight ? 'border-slate-700 bg-slate-900 text-white' : 'border-slate-200 bg-white'}`}>
+      <p className={`mb-1 text-[10px] font-semibold uppercase tracking-wider ${highlight ? 'text-slate-300' : 'text-slate-500'}`}>{label}</p>
+      <p className={`font-mono text-lg font-bold ${highlight ? 'text-white' : 'text-slate-900'}`}>{value}</p>
     </div>
   );
 }
 
 function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="flex justify-between items-center py-2.5 border-b border-border/20 last:border-0">
+    <div className="flex items-center justify-between border-b border-slate-200 py-2.5 last:border-0">
       <span className="text-xs text-muted-foreground">{label}</span>
-      <span className={`text-sm text-foreground ${mono ? 'font-mono' : ''}`}>{value || '—'}</span>
+      <span className={`text-sm text-slate-900 ${mono ? 'font-mono' : ''}`}>{value || '—'}</span>
     </div>
   );
 }
@@ -404,7 +409,7 @@ function SelectField({ value, options, onChange }: { value: string; options: str
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
-      className="h-10 w-full rounded-xl border border-border/40 bg-background/80 px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/20"
+      className="h-10 w-full rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-slate-300"
     >
       {uniqueOptions.map((option) => (
         <option key={option} value={option}>{option}</option>

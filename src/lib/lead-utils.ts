@@ -10,6 +10,13 @@ const CENTER_ALIASES: Array<[RegExp, string]> = [
   [/supreme\s*(?:headquarters|hq).*(thane)/i, 'Supreme Headquarters, Thane'],
 ];
 
+const DISQUALIFIED_STAGE_VALUES = new Set([
+  'called - did not answer',
+  'called - invalid contact no',
+  'no response after trial',
+  'client unresponsive',
+]);
+
 const GROUPABLE_VALUE_KEYS: GroupableLeadKey[] = [
   'fullName',
   'createdAt',
@@ -56,6 +63,13 @@ export interface LeadRenderGroupRow {
   groupKey: GroupableLeadKey;
   count: number;
   groupNumber: string;
+  groupMetrics: {
+    leadCount: number;
+    converted: number;
+    trialsCompleted: number;
+    trialsScheduled: number;
+    disqualified: number;
+  };
   parentGroupIds: string[];
 }
 
@@ -356,6 +370,23 @@ export function buildCountSummary(
     });
 }
 
+function buildGroupMetrics(leads: Lead[]) {
+  const stageValue = (lead: Lead) => cleanLooseText(lead.stageName).toLowerCase();
+
+  const converted = leads.filter((lead) => /converted|membership sold|sold/.test(stageValue(lead))).length;
+  const trialsCompleted = leads.filter((lead) => /trial completed|trial done|trial finished/.test(stageValue(lead))).length;
+  const trialsScheduled = leads.filter((lead) => /trial scheduled/.test(stageValue(lead))).length;
+  const disqualified = leads.filter((lead) => DISQUALIFIED_STAGE_VALUES.has(stageValue(lead))).length;
+
+  return {
+    leadCount: leads.length,
+    converted,
+    trialsCompleted,
+    trialsScheduled,
+    disqualified,
+  };
+}
+
 export function flattenGroupedLeads(leads: Lead[], groupKeys: GroupableLeadKey[]): LeadRenderRow[] {
   const indexed = leads.map((lead) => ({ lead }));
 
@@ -420,6 +451,7 @@ export function flattenGroupedLeads(leads: Lead[], groupKeys: GroupableLeadKey[]
         groupKey: currentKey,
         count: groupEntries.length,
         groupNumber,
+        groupMetrics: buildGroupMetrics(groupEntries.map(({ lead }) => lead)),
         parentGroupIds,
       });
       rows.push(...walk(groupEntries, rest, depth + 1, id, [...parentGroupIds, id], groupNumber));

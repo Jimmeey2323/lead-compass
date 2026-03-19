@@ -7,9 +7,10 @@ interface Props {
   followUps: FollowUp[];
   status: string;
   compact?: boolean;
+  onQuickEdit?: (followUp: FollowUp) => void;
 }
 
-export function FollowUpTimeline({ followUps, status, compact = false }: Props) {
+export function FollowUpTimeline({ followUps, status, compact = false, onQuickEdit }: Props) {
   if (compact) {
     return (
       <div className="flex items-center gap-1.5">
@@ -40,9 +41,18 @@ export function FollowUpTimeline({ followUps, status, compact = false }: Props) 
           return (
             <Tooltip key={i}>
               <TooltipTrigger asChild>
-                <div className={`flex h-6 w-6 items-center justify-center rounded-full border cursor-default transition-all hover:scale-110 ${ringClass}`}>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    if (!onQuickEdit) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    onQuickEdit(fu);
+                  }}
+                  className={`flex h-6 w-6 items-center justify-center rounded-full border transition-all hover:scale-110 ${onQuickEdit ? 'cursor-pointer' : 'cursor-default'} ${ringClass}`}
+                >
                   {iconEl}
-                </div>
+                </button>
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-[360px] p-3 space-y-1.5">
                 <p className="text-xs font-semibold text-foreground">Follow Up {fu.index}</p>

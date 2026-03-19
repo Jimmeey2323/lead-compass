@@ -8,11 +8,16 @@ import { LeadBoard } from '@/components/LeadBoard';
 import { LeadComparison } from '@/components/LeadComparison';
 import { defaultFilters, parseDateStr, getDateRange } from '@/types/leads';
 import type { FilterState, ViewMode, Lead } from '@/types/leads';
-import { RefreshCw, LayoutList, Users, Loader2, Zap, Rows3, GitCompareArrows, Building2, Workflow } from 'lucide-react';
+import { RefreshCw, LayoutList, Users, Loader2, Zap, Rows3, GitCompareArrows, Building2, Workflow, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { toast } from '@/components/ui/sonner';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { buildLeadOptions, cleanLooseText, getCurrentWeekRangeLabel } from '@/lib/lead-utils';
 
 const DEFAULT_CENTER_TOKENS = ['kwality house', 'kemps corner'];
+const COMPARISON_SECRET = '9818';
+const COMPARISON_UNLOCK_STORAGE_KEY = 'lead-compass:comparison-unlocked';
 
 function findDefaultCenterOption(centers: string[]): string | null {
   if (!centers.length) return null;
@@ -60,6 +65,9 @@ const Index = () => {
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [view, setView] = useState<ViewMode>('table');
   const hasAppliedInitialCenterRef = useRef(false);
+  const [isComparisonUnlocked, setIsComparisonUnlocked] = useState(false);
+  const [isComparisonDialogOpen, setIsComparisonDialogOpen] = useState(false);
+  const [comparisonCode, setComparisonCode] = useState('');
 
   const filteredLeads = useMemo(() => applyFilters(leads, filters), [leads, filters]);
   const options = useMemo(() => buildLeadOptions(leads), [leads]);
@@ -78,6 +86,44 @@ const Index = () => {
       center: matchedCenter,
     }));
   }, [options.centers]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setIsComparisonUnlocked(window.sessionStorage.getItem(COMPARISON_UNLOCK_STORAGE_KEY) === 'true');
+  }, []);
+
+  const handleViewChange = (nextView: ViewMode) => {
+    if (nextView !== 'comparison') {
+      setView(nextView);
+      return;
+    }
+
+    if (isComparisonUnlocked) {
+      setView('comparison');
+      return;
+    }
+
+    setComparisonCode('');
+    setIsComparisonDialogOpen(true);
+  };
+
+  const unlockComparisonView = () => {
+    if (comparisonCode.trim() !== COMPARISON_SECRET) {
+      toast.error('Incorrect secret code', {
+        description: 'Comparison view stays locked until the correct code is entered.',
+      });
+      return;
+    }
+
+    setIsComparisonUnlocked(true);
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem(COMPARISON_UNLOCK_STORAGE_KEY, 'true');
+    }
+    setIsComparisonDialogOpen(false);
+    setComparisonCode('');
+    setView('comparison');
+    toast.success('Comparison view unlocked');
+  };
 
   const views: Array<{ key: ViewMode; label: string; icon: typeof LayoutList }> = [
     { key: 'table', label: 'Detailed', icon: LayoutList },
@@ -131,7 +177,7 @@ const Index = () => {
                 {views.map(({ key, label, icon: Icon }) => (
                   <button
                     key={key}
-                    onClick={() => setView(key)}
+                    onClick={() => handleViewChange(key)}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       view === key
                         ? 'bg-blue-900 text-white shadow-sm ring-1 ring-blue-700/60'
@@ -139,6 +185,7 @@ const Index = () => {
                     }`}
                   >
                     <Icon className="h-3.5 w-3.5" /> {label}
+                    {key === 'comparison' && !isComparisonUnlocked && <Lock className="h-3 w-3 opacity-75" />}
                   </button>
                 ))}
               </div>
@@ -155,19 +202,6 @@ const Index = () => {
             </div>
         </div>
       </header>
-
-      {isTableWorkspace && (
-        <div className="pointer-events-none fixed inset-x-0 top-[4.3rem] z-40 flex justify-end px-4 md:px-6">
-          <div className="pointer-events-auto mt-2 flex items-center gap-2 rounded-2xl border border-border/40 bg-background/76 p-2 shadow-elevated backdrop-blur-xl">
-            <span className="rounded-xl bg-primary/8 px-3 py-1.5 text-[11px] font-medium text-foreground">
-              {filters.datePreset === 'lastWeek' ? 'Last week' : filters.datePreset === 'thisWeek' ? 'This week' : 'Custom view'}
-            </span>
-            <span className="hidden rounded-xl bg-background/80 px-3 py-1.5 text-[11px] text-muted-foreground md:inline-flex">
-              {filters.center === 'all' ? 'All centers' : filters.center}
-            </span>
-          </div>
-        </div>
-      )}
 
       <main className={`relative z-10 ${isTableWorkspace ? 'h-[calc(100vh-4rem)] w-full overflow-hidden px-0 py-0' : 'mx-auto max-w-[1680px] space-y-5 px-4 py-5 md:px-6'}`}>
         {error && (
@@ -199,7 +233,7 @@ const Index = () => {
             {view === 'stage-board' && <LeadBoard leads={filteredLeads} allLeads={leads} options={options} groupBy="stageName" title="Stage board" />}
             {view === 'center-board' && <LeadBoard leads={filteredLeads} allLeads={leads} options={options} groupBy="center" title="Center board" />}
             {view === 'associate' && <AssociateOverview leads={filteredLeads} allLeads={leads} options={options} />}
-            {view === 'comparison' && <LeadComparison leads={filteredLeads} />}
+            {view === 'comparison' && isComparisonUnlocked && <LeadComparison leads={filteredLeads} />}
           </>
         )}
 
@@ -212,6 +246,44 @@ const Index = () => {
           </div>
         )}
       </main>
+
+      <Dialog open={isComparisonDialogOpen} onOpenChange={setIsComparisonDialogOpen}>
+        <DialogContent className="sm:max-w-md rounded-3xl border-border/50 bg-background/95 p-0 overflow-hidden">
+          <div className="border-b border-border/30 px-6 py-5">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <Lock className="h-4 w-4 text-primary" /> Unlock comparison view
+              </DialogTitle>
+              <DialogDescription>
+                Enter the secret code to access the comparison dashboard.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="space-y-4 px-6 py-5">
+            <div className="space-y-2">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Secret code</label>
+              <Input
+                value={comparisonCode}
+                onChange={(event) => setComparisonCode(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    unlockComparisonView();
+                  }
+                }}
+                inputMode="numeric"
+                placeholder="Enter code"
+                className="h-11 rounded-2xl border-border/50 bg-background/80"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-border/30 px-6 py-4">
+            <Button variant="outline" className="rounded-xl" onClick={() => setIsComparisonDialogOpen(false)}>Cancel</Button>
+            <Button className="rounded-xl" onClick={unlockComparisonView}>Unlock</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

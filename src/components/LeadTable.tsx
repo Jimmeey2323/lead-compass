@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, ChevronsDownUp, ChevronsUpDown, ChevronDown, ChevronRight as ChevronRightIcon, Layers3, PanelLeftClose, PanelLeftOpen, Search, RotateCcw, SlidersHorizontal, Sparkles, CalendarRange, Pin, PinOff, MapPin, UserRound } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, Check, ChevronLeft, ChevronRight, ChevronsDownUp, ChevronsUpDown, ChevronDown, ChevronRight as ChevronRightIcon, CircleSlash, Layers3, MessageSquarePlus, PanelLeftClose, PanelLeftOpen, Search, RotateCcw, SlidersHorizontal, Sparkles, CalendarRange, Pin, PinOff, MapPin, UserRound, Users } from 'lucide-react';
 import type { DatePreset, FilterState, GroupableLeadKey, Lead, LeadOptionSets } from '@/types/leads';
+import type { FollowUp } from '@/types/leads';
 import { parseDateStr } from '@/types/leads';
 import { FollowUpTimeline } from './FollowUpTimeline';
 import { LeadDrillDown } from './LeadDrillDown';
@@ -19,8 +20,12 @@ import {
 import { LeadHoverInfo } from './LeadDisplay';
 import { Button } from '@/components/ui/button';
 import { MultiSelectDropdown } from './MultiSelectDropdown';
+import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { defaultFilters } from '@/types/leads';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { buildMomencePayload, useUpdateLead } from '@/hooks/useLeadsData';
+import { toast } from '@/components/ui/sonner';
 
 interface Props {
   leads: Lead[];
@@ -76,7 +81,7 @@ export function LeadTable({ leads, allLeads, options, filters, onFiltersChange, 
   const [sortKey, setSortKey] = useState<SortKey>('createdAt');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [groupKeys, setGroupKeys] = useState<GroupableLeadKey[]>([]);
+  const [groupKeys, setGroupKeys] = useState<GroupableLeadKey[]>(['associate']);
   const [groupToAdd, setGroupToAdd] = useState<GroupableLeadKey | ''>('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(100);
@@ -86,9 +91,13 @@ export function LeadTable({ leads, allLeads, options, filters, onFiltersChange, 
   const [isSidebarPinned, setIsSidebarPinned] = useState(false);
   const [isSidebarInteracting, setIsSidebarInteracting] = useState(false);
   const [isQuickFiltersOpen, setIsQuickFiltersOpen] = useState(false);
+  const [quickFollowUpLead, setQuickFollowUpLead] = useState<Lead | null>(null);
+  const [quickFollowUpItem, setQuickFollowUpItem] = useState<FollowUp | null>(null);
+  const [quickFollowUpComment, setQuickFollowUpComment] = useState('');
   const [columnWidths, setColumnWidths] = useState<number[]>(() => TABLE_COLUMNS.map((column) => column.width));
   const resizeStateRef = useRef<{ index: number; startX: number; startWidth: number } | null>(null);
   const sidebarRef = useRef<HTMLElement | null>(null);
+  const updateLead = useUpdateLead();
 
   const sorted = useMemo(() => {
     const result = [...leads];
@@ -248,6 +257,12 @@ export function LeadTable({ leads, allLeads, options, filters, onFiltersChange, 
   const availableGroupColumns = GROUPABLE_COLUMNS.filter(({ key }) => !groupKeys.includes(key));
   const rowHeightClass = 'h-10 max-h-10';
   const summaryRowsToShow = isStageSummaryCollapsed ? 5 : Math.max(displayedStageSummary.length, displayedSourceSummary.length);
+  const sidebarStatCards = [
+    { label: 'Visible', value: String(visibleRows.length) },
+    { label: 'Page', value: `${page}/${totalPages}` },
+    { label: 'Groups', value: String(groupKeys.length) },
+    { label: 'Rows', value: String(sorted.length) },
+  ];
 
   const SortIcon = ({ col }: { col: SortKey }) => {
     if (sortKey !== col) return <ArrowUpDown className="h-3 w-3 opacity-30" />;
@@ -256,9 +271,48 @@ export function LeadTable({ leads, allLeads, options, filters, onFiltersChange, 
       : <ArrowDown className="h-3 w-3 text-primary" />;
   };
 
+  const openQuickFollowUpEditor = (lead: Lead, followUp: FollowUp) => {
+    setQuickFollowUpLead(lead);
+    setQuickFollowUpItem(followUp);
+    setQuickFollowUpComment(followUp.comment === '-' ? '' : followUp.comment);
+  };
+
+  const closeQuickFollowUpEditor = () => {
+    setQuickFollowUpLead(null);
+    setQuickFollowUpItem(null);
+    setQuickFollowUpComment('');
+  };
+
+  const saveQuickFollowUpComment = async () => {
+    if (!quickFollowUpLead || !quickFollowUpItem) return;
+
+    const updatedFollowUps = quickFollowUpLead.followUps.map((item) => (
+      item.index === quickFollowUpItem.index
+        ? { ...item, comment: quickFollowUpComment.trim() || '-' }
+        : item
+    ));
+
+    try {
+      await updateLead.mutateAsync({
+        leadId: quickFollowUpLead.id,
+        payload: buildMomencePayload(quickFollowUpLead, {
+          ...quickFollowUpLead,
+          followUps: updatedFollowUps,
+        }),
+      });
+
+      toast.success('Follow-up comment saved');
+      closeQuickFollowUpEditor();
+    } catch (error) {
+      toast.error('Unable to save follow-up comment', {
+        description: error instanceof Error ? error.message : 'An unexpected error occurred while saving the comment.',
+      });
+    }
+  };
+
   return (
     <>
-      <div className="glass-strong flex h-full w-full min-h-0 overflow-hidden shadow-elevated">
+      <div className="glass-strong mt-2 flex h-[calc(100%-0.5rem)] w-full min-h-0 overflow-hidden rounded-[28px] shadow-elevated">
         <aside
           ref={sidebarRef}
           onMouseEnter={() => setIsSidebarInteracting(true)}
@@ -269,17 +323,16 @@ export function LeadTable({ leads, allLeads, options, filters, onFiltersChange, 
               setIsSidebarInteracting(false);
             }
           }}
-          className={`flex min-h-0 shrink-0 flex-col overflow-hidden border-r border-border/40 bg-[linear-gradient(180deg,rgba(2,6,23,0.98),rgba(15,23,42,0.96))] text-slate-100 transition-[width] duration-300 ${isSidebarCollapsed ? 'w-[64px]' : 'w-[348px]'}`}
+          className={`flex min-h-0 shrink-0 flex-col overflow-hidden border-r border-slate-800/70 bg-[linear-gradient(180deg,rgba(10,14,24,0.98),rgba(15,23,42,0.96))] text-slate-100 transition-[width] duration-300 ${isSidebarCollapsed ? 'w-[64px]' : 'w-[344px]'}`}
         >
-          <div className={`flex items-center border-b border-white/10 ${isSidebarCollapsed ? 'justify-center px-2 py-3' : 'justify-between px-4 py-4'}`}>
+          <div className={`flex h-12 items-center border-b border-white/8 ${isSidebarCollapsed ? 'justify-center px-2 py-3' : 'justify-between px-4 py-3'}`}>
             {!isSidebarCollapsed ? (
               <div>
-                <p className="text-sm font-semibold text-white">Insights & filters</p>
-                <p className="mt-1 text-[11px] text-slate-400">Counts, search, filters, and grouping in one premium rail.</p>
+                <p className="text-sm font-semibold text-white">Workspace sidebar</p>
               </div>
             ) : (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-1.5 shadow-[0_10px_30px_-16px_rgba(56,189,248,0.8)]">
-                <Sparkles className="h-3.5 w-3.5 text-sky-300" />
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-slate-200" />
               </div>
             )}
             <Button
@@ -297,7 +350,7 @@ export function LeadTable({ leads, allLeads, options, filters, onFiltersChange, 
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsSidebarPinned((current) => !current)}
-                className="h-9 w-9 rounded-xl p-0 text-slate-200 hover:bg-white/10 hover:text-white"
+                className="h-9 w-9 rounded-xl p-0 text-slate-300 hover:bg-white/8 hover:text-white"
               >
                 {isSidebarPinned ? <Pin className="h-4 w-4" /> : <PinOff className="h-4 w-4" />}
               </Button>
@@ -306,7 +359,7 @@ export function LeadTable({ leads, allLeads, options, filters, onFiltersChange, 
 
           {isSidebarCollapsed ? (
             <div className="flex min-h-0 flex-1 flex-col items-center gap-2 overflow-hidden px-2 py-3">
-              <CollapsedRailButton icon={SlidersHorizontal} label="Filters" value={String(activeFilterCount)} onClick={() => setIsSidebarCollapsed(false)} />
+              <CollapsedRailButton icon={SlidersHorizontal} label="Filters" onClick={() => setIsSidebarCollapsed(false)} />
               <CollapsedRailButton icon={Layers3} label="Groups" value={String(groupKeys.length)} onClick={() => setIsSidebarCollapsed(false)} />
               <CollapsedRailButton icon={Sparkles} label="Rows" value={String(sorted.length)} onClick={() => setIsSidebarCollapsed(false)} />
               <CollapsedRailButton icon={CalendarRange} label="Page" value={`${page}`} onClick={() => setIsSidebarCollapsed(false)} />
@@ -317,24 +370,35 @@ export function LeadTable({ leads, allLeads, options, filters, onFiltersChange, 
           ) : (
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
               <div className="space-y-4">
+                <section className="rounded-[24px] border border-white/8 bg-white/[0.03] p-3.5">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-300">Overview</p>
+                      <p className="mt-1 text-[11px] text-slate-400">A quick pulse of the visible workspace.</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {sidebarStatCards.map((card) => (
+                      <SidebarStatCard key={card.label} label={card.label} value={card.value} />
+                    ))}
+                  </div>
+                </section>
+
                 {filters && onFiltersChange && (
-                  <section className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                  <section className="rounded-[24px] border border-white/8 bg-white/[0.03] p-3.5">
                     <div className="mb-3 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <SlidersHorizontal className="h-4 w-4 text-sky-300" />
+                        <SlidersHorizontal className="h-4 w-4 text-slate-300" />
                         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">Filters</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="rounded-full border border-slate-700/80 bg-slate-900/80 px-2.5 py-1 text-[10px] font-mono-data text-white">
-                          {activeFilterCount} active
-                        </span>
                         {activeFilterCount > 0 && (
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             onClick={() => onFiltersChange(defaultFilters)}
-                            className="h-8 rounded-xl px-2 text-[11px] text-slate-200 hover:bg-white/10 hover:text-white"
+                            className="h-8 rounded-xl px-2 text-[11px] text-slate-200 hover:bg-white/8 hover:text-white"
                           >
                             <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Reset
                           </Button>
@@ -350,7 +414,7 @@ export function LeadTable({ leads, allLeads, options, filters, onFiltersChange, 
                             value={filters.search}
                             onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })}
                             placeholder="Name, phone, email, ID"
-                            className="h-10 rounded-xl border-white/10 bg-slate-900/80 pl-10 text-sm text-slate-100 placeholder:text-slate-500"
+                            className="h-10 rounded-xl border-white/10 bg-slate-950/70 pl-10 text-sm text-slate-100 placeholder:text-slate-500"
                           />
                         </div>
                       </div>
@@ -362,9 +426,9 @@ export function LeadTable({ leads, allLeads, options, filters, onFiltersChange, 
                         options={DATE_PRESET_OPTIONS.map((option) => ({ label: option.label, value: option.value }))}
                       />
                       {filters.datePreset === 'custom' && (
-                        <div className="grid grid-cols-1 gap-3 rounded-2xl border border-white/10 bg-slate-900/50 p-3">
+                        <div className="grid grid-cols-1 gap-3 rounded-2xl border border-white/8 bg-slate-950/55 p-3">
                           <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                            <CalendarRange className="h-3.5 w-3.5 text-sky-300" /> Custom range
+                            <CalendarRange className="h-3.5 w-3.5 text-slate-300" /> Custom range
                           </div>
                           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                             <FormDateInput
@@ -402,16 +466,16 @@ export function LeadTable({ leads, allLeads, options, filters, onFiltersChange, 
                   </section>
                 )}
 
-                <section className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                <section className="rounded-[24px] border border-white/8 bg-white/[0.03] p-3.5">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
-                      <Layers3 className="h-4 w-4 text-sky-300" />
+                      <Layers3 className="h-4 w-4 text-slate-300" />
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">Grouping</p>
                     </div>
                     <select
                       value={pageSize}
                       onChange={(event) => setPageSize(Number(event.target.value))}
-                      className="h-7 rounded-lg border border-white/10 bg-slate-900/80 px-2 text-[10px] font-medium text-slate-100"
+                      className="h-7 rounded-lg border border-white/10 bg-slate-950/70 px-2 text-[10px] font-medium text-slate-100"
                     >
                       {PAGE_SIZE_OPTIONS.map((size) => (
                         <option key={size} value={size}>{size}/page</option>
@@ -426,16 +490,16 @@ export function LeadTable({ leads, allLeads, options, filters, onFiltersChange, 
                       options={[{ label: 'Select grouping', value: '' }, ...availableGroupColumns.map((column) => ({ label: column.label, value: column.key }))]}
                     />
                     <div className="flex flex-wrap gap-2">
-                      <Button type="button" onClick={addGroup} disabled={!groupToAdd} className="rounded-xl bg-sky-500 text-slate-950 hover:bg-sky-400">Add</Button>
+                      <Button type="button" onClick={addGroup} disabled={!groupToAdd} className="rounded-xl bg-slate-100 text-slate-950 hover:bg-white">Add</Button>
                       {groupKeys.length > 0 && (
-                        <Button type="button" variant="outline" onClick={() => setGroupKeys([])} className="rounded-xl border-white/10 bg-white/5 text-slate-100 hover:bg-white/10">Clear</Button>
+                        <Button type="button" variant="outline" onClick={() => setGroupKeys([])} className="rounded-xl border-white/10 bg-white/[0.04] text-slate-100 hover:bg-white/[0.08]">Clear</Button>
                       )}
                       {groupRows.length > 0 && (
                         <>
-                          <Button type="button" variant="outline" onClick={expandAllGroups} className="rounded-xl border-white/10 bg-white/5 text-slate-100 hover:bg-white/10">
+                          <Button type="button" variant="outline" onClick={expandAllGroups} className="rounded-xl border-white/10 bg-white/[0.04] text-slate-100 hover:bg-white/[0.08]">
                             <ChevronsDownUp className="mr-1.5 h-4 w-4" /> Expand
                           </Button>
-                          <Button type="button" variant="outline" onClick={collapseAllGroups} className="rounded-xl border-white/10 bg-white/5 text-slate-100 hover:bg-white/10">
+                          <Button type="button" variant="outline" onClick={collapseAllGroups} className="rounded-xl border-white/10 bg-white/[0.04] text-slate-100 hover:bg-white/[0.08]">
                             <ChevronsUpDown className="mr-1.5 h-4 w-4" /> Collapse
                           </Button>
                         </>
@@ -448,7 +512,7 @@ export function LeadTable({ leads, allLeads, options, filters, onFiltersChange, 
                             key={key}
                             type="button"
                             onClick={() => setGroupKeys((current) => current.filter((item) => item !== key))}
-                            className="rounded-full border border-sky-400/20 bg-sky-400/10 px-3 py-1.5 text-[11px] font-medium text-sky-200"
+                            className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-[11px] font-medium text-slate-200"
                           >
                             {GROUPABLE_COLUMNS.find((column) => column.key === key)?.label} ×
                           </button>
@@ -458,7 +522,7 @@ export function LeadTable({ leads, allLeads, options, filters, onFiltersChange, 
                   </div>
                 </section>
 
-                <section className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.08),rgba(255,255,255,0.03))] p-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                <section className="rounded-[24px] border border-white/8 bg-white/[0.03] p-3.5">
                   <div className="mb-3 flex items-center justify-between">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">Counts</p>
@@ -468,7 +532,7 @@ export function LeadTable({ leads, allLeads, options, filters, onFiltersChange, 
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-8 rounded-xl px-2 text-[11px] text-slate-200 hover:bg-white/10 hover:text-white"
+                      className="h-8 rounded-xl px-2 text-[11px] text-slate-200 hover:bg-white/[0.08] hover:text-white"
                       onClick={() => setIsStageSummaryCollapsed((current) => !current)}
                     >
                       {isStageSummaryCollapsed ? 'More' : 'Less'}
@@ -499,7 +563,7 @@ export function LeadTable({ leads, allLeads, options, filters, onFiltersChange, 
                     key={column.key}
                     onClick={column.sortKey ? () => toggleSort(column.sortKey!) : undefined}
                     style={{ width: `${columnWidths[index]}px`, minWidth: `${columnWidths[index]}px` }}
-                    className={`group/column relative h-10 px-4 text-left text-[10px] uppercase tracking-widest font-semibold text-muted-foreground whitespace-nowrap ${column.sortKey ? 'cursor-pointer select-none transition-colors' : ''}`}
+                    className={`group/column relative h-12 px-4 text-left text-[10px] uppercase tracking-widest font-semibold text-muted-foreground whitespace-nowrap ${column.sortKey ? 'cursor-pointer select-none transition-colors' : ''}`}
                   >
                     <span className="inline-flex items-center gap-1 pr-4">
                       {column.label} {column.sortKey ? <SortIcon col={column.sortKey} /> : null}
@@ -522,15 +586,21 @@ export function LeadTable({ leads, allLeads, options, filters, onFiltersChange, 
                 if (row.type === 'group') {
                   const collapsed = collapsedGroupIds.includes(row.id);
                   return (
-                    <tr key={row.id} className="h-10 cursor-pointer bg-slate-950/[0.95] text-slate-50 hover:bg-slate-900">
+                    <tr key={row.id} className="h-11 cursor-pointer bg-slate-950/[0.95] text-slate-50 hover:bg-slate-900">
                       <td className="border-b border-slate-800 px-4 py-2 align-middle text-xs font-mono text-slate-300 whitespace-nowrap">{row.groupNumber}</td>
                       <td colSpan={10} className="border-b border-slate-800 px-4 py-2 align-middle" onClick={() => toggleGroup(row.id)}>
-                        <div className="flex items-center justify-between" style={{ paddingLeft: `${row.depth * 18}px` }}>
-                          <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-200/90">
+                        <div className="flex items-center gap-3" style={{ paddingLeft: `${row.depth * 18}px` }}>
+                          <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-200/90 shrink-0">
                             {collapsed ? <ChevronRightIcon className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                             {GROUPABLE_COLUMNS.find((column) => column.key === row.groupKey)?.label}: {row.label}
                           </span>
-                          <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-medium text-slate-100">{row.count}</span>
+                          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                            <GroupMetricPill icon={Users} label="Leads" value={row.groupMetrics.leadCount} />
+                            <GroupMetricPill icon={Check} label="Converted" value={row.groupMetrics.converted} />
+                            <GroupMetricPill icon={Check} label="Trials completed" value={row.groupMetrics.trialsCompleted} />
+                            <GroupMetricPill icon={CalendarRange} label="Trials scheduled" value={row.groupMetrics.trialsScheduled} />
+                            <GroupMetricPill icon={CircleSlash} label="Disqualified" value={row.groupMetrics.disqualified} />
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -543,6 +613,7 @@ export function LeadTable({ leads, allLeads, options, filters, onFiltersChange, 
                     row={row}
                     density={density}
                     rowHeightClass={rowHeightClass}
+                    onQuickFollowUpEdit={openQuickFollowUpEditor}
                     onSelect={setSelectedLead}
                   />
                 );
@@ -625,6 +696,42 @@ export function LeadTable({ leads, allLeads, options, filters, onFiltersChange, 
         </div>
       )}
 
+      <Dialog open={Boolean(quickFollowUpLead && quickFollowUpItem)} onOpenChange={(open) => { if (!open) closeQuickFollowUpEditor(); }}>
+        <DialogContent className="sm:max-w-lg rounded-3xl border-border/50 bg-background/95 p-0 overflow-hidden">
+          <div className="border-b border-border/30 px-6 py-5">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base">
+                <MessageSquarePlus className="h-4 w-4 text-primary" /> Quick follow-up comment
+              </DialogTitle>
+              <DialogDescription>
+                {quickFollowUpLead && quickFollowUpItem
+                  ? `${quickFollowUpLead.fullName} • Follow Up ${quickFollowUpItem.index}${quickFollowUpItem.date ? ` • ${quickFollowUpItem.date}` : ''}`
+                  : 'Add or update feedback without opening the full lead editor.'}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="space-y-4 px-6 py-5">
+            <div className="space-y-2">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Comment</label>
+              <Textarea
+                value={quickFollowUpComment}
+                onChange={(event) => setQuickFollowUpComment(event.target.value)}
+                placeholder="Add follow-up notes"
+                className="min-h-[132px] rounded-2xl border-border/50 bg-background/80"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="border-t border-border/30 px-6 py-4">
+            <Button variant="outline" className="rounded-xl" onClick={closeQuickFollowUpEditor}>Cancel</Button>
+            <Button className="rounded-xl" onClick={saveQuickFollowUpComment} disabled={updateLead.isPending}>
+              {updateLead.isPending ? 'Saving…' : 'Save comment'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AnimatePresence>
         {selectedLead && (
           <>
@@ -656,11 +763,13 @@ function LeadDataRow({
   row,
   density,
   rowHeightClass,
+  onQuickFollowUpEdit,
   onSelect,
 }: {
   row: LeadRenderDataRow;
   density: 'comfortable' | 'compact';
   rowHeightClass: string;
+  onQuickFollowUpEdit: (lead: Lead, followUp: FollowUp) => void;
   onSelect: (lead: Lead) => void;
 }) {
   const { lead } = row;
@@ -671,7 +780,6 @@ function LeadDataRow({
   const sourcePreview = cleanLooseText(lead.sourceName) || '—';
   const channelPreview = cleanLooseText(lead.channel) || 'No channel';
   const stagePreview = cleanLooseText(lead.stageName) || '—';
-  const statusPreview = cleanLooseText(lead.status) || '—';
   const ltvPreview = lead.ltv > 0 ? `₹${lead.ltv.toLocaleString()}` : '—';
 
   return (
@@ -702,7 +810,7 @@ function LeadDataRow({
         <span className="block truncate text-xs font-semibold text-foreground">{sourcePreview}</span>
       </td>
       <td className="px-4 py-2 align-middle">
-        <span className="block truncate text-xs font-semibold text-foreground">{`${stagePreview}${statusPreview ? ` · ${statusPreview}` : ''}`}</span>
+        <span className="block truncate text-xs font-semibold text-foreground">{stagePreview}</span>
       </td>
       <td className="px-4 py-2 align-middle">
         <Tooltip>
@@ -719,7 +827,7 @@ function LeadDataRow({
         </Tooltip>
       </td>
       <td className="px-4 py-2 align-middle">
-        <FollowUpTimeline followUps={lead.followUps} status={lead.status} compact />
+        <FollowUpTimeline followUps={lead.followUps} status={lead.status} compact onQuickEdit={(followUp) => onQuickFollowUpEdit(lead, followUp)} />
       </td>
       <td className="px-4 py-2 align-middle">
         <span className="block truncate text-xs text-foreground">{`${centerPreview}${cleanLooseText(lead.trialStatus) ? ` · ${cleanLooseText(lead.trialStatus)}` : ''}`}</span>
@@ -795,7 +903,7 @@ function CollapsedRailButton({
 }: {
   icon: typeof Sparkles;
   label: string;
-  value: string;
+  value?: string;
   onClick: () => void;
 }) {
   return (
@@ -803,11 +911,11 @@ function CollapsedRailButton({
       type="button"
       onClick={onClick}
       className="group flex h-11 w-11 flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-slate-300 transition-all hover:-translate-y-0.5 hover:border-sky-300/40 hover:bg-white/[0.08] hover:text-white"
-      aria-label={`${label}: ${value}`}
-      title={`${label}: ${value}`}
+      aria-label={value ? `${label}: ${value}` : label}
+      title={value ? `${label}: ${value}` : label}
     >
       <Icon className="h-3.5 w-3.5 text-sky-300 transition-transform group-hover:scale-105" />
-      <span className="mt-1 font-mono-data text-[9px] font-semibold leading-none text-slate-200">{value}</span>
+      {value && <span className="mt-1 font-mono-data text-[9px] font-semibold leading-none text-slate-200">{value}</span>}
     </button>
   );
 }
@@ -851,6 +959,24 @@ function QuickFilterRow({
         })}
       </div>
     </div>
+  );
+}
+
+function GroupMetricPill({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Users;
+  label: string;
+  value: number;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[10px] font-medium text-slate-100">
+      <Icon className="h-3 w-3 text-slate-300" />
+      <span className="text-slate-300">{label}</span>
+      <span className="font-mono-data text-white">{value}</span>
+    </span>
   );
 }
 

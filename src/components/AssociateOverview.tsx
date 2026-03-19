@@ -114,13 +114,13 @@ export function AssociateOverview({ leads, allLeads, options }: Props) {
 
       {/* Associate Table */}
       <div className="glass-strong rounded-2xl shadow-elevated overflow-hidden">
-        <div className="px-5 py-3 border-b border-border/30">
+        <div className="px-5 py-3 border-b border-border/30 bg-background/70">
           <h3 className="text-sm font-semibold text-foreground">Associate Performance</h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full" style={{ minWidth: '1220px' }}>
-            <thead>
-              <tr className="gradient-subtle">
+          <table className="w-full border-separate border-spacing-0" style={{ minWidth: '1220px' }}>
+            <thead className="sticky top-0 z-10 lead-table-head">
+              <tr className="lead-table-header">
                 {([
                   ['Associate', 'name'],
                   ['Leads', 'totalLeads'],
@@ -140,12 +140,12 @@ export function AssociateOverview({ leads, allLeads, options }: Props) {
                   <th
                     key={label}
                     onClick={() => toggleSort(key)}
-                    className="h-11 cursor-pointer px-5 text-left align-middle text-[10px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/40 whitespace-nowrap transition-colors hover:bg-primary/[0.03]"
+                    className="h-12 cursor-pointer px-5 text-left align-middle text-[10px] font-semibold uppercase tracking-wider text-slate-300 whitespace-nowrap transition-colors"
                   >
                     <span className="inline-flex items-center gap-1.5">{label} <SortIcon column={key} /></span>
                   </th>
                 ))}
-                <th className="h-11 px-5 text-left align-middle font-semibold text-muted-foreground border-b border-border/40 text-[10px] uppercase tracking-wider whitespace-nowrap" />
+                <th className="h-12 px-5 text-left align-middle font-semibold text-slate-300 text-[10px] uppercase tracking-wider whitespace-nowrap" />
               </tr>
             </thead>
             <tbody>
@@ -153,33 +153,33 @@ export function AssociateOverview({ leads, allLeads, options }: Props) {
                 <Fragment key={s.name}>
                   <tr
                     onClick={() => setExpandedAssociate(expandedAssociate === s.name ? null : s.name)}
-                    className="group transition-all duration-150 hover:bg-primary/[0.03] cursor-pointer"
+                    className="group cursor-pointer border-b border-border/20 bg-white/75 transition-colors duration-150 odd:bg-background/88 even:bg-slate-50/78 hover:bg-slate-100"
                   >
-                    <td className="px-5 py-3 text-sm font-medium text-foreground border-b border-border/15 whitespace-nowrap">{s.name}</td>
-                    <td className="px-5 py-3 text-sm font-mono text-foreground border-b border-border/15">{s.totalLeads}</td>
-                    <td className="px-5 py-3 text-sm font-mono text-accent-converted font-medium border-b border-border/15">{s.converted}</td>
-                    <td className="px-5 py-3 text-sm font-mono text-accent-overdue border-b border-border/15">{s.lost}</td>
-                    <td className="px-5 py-3 text-sm font-mono text-foreground border-b border-border/15">{s.active}</td>
-                    <td className="px-5 py-3 border-b border-border/15">
+                    <td className="px-5 py-3 text-sm font-medium text-foreground whitespace-nowrap">{s.name}</td>
+                    <td className="px-5 py-3 text-sm font-mono text-foreground">{s.totalLeads}</td>
+                    <td className="px-5 py-3 text-sm font-mono font-medium text-foreground">{s.converted}</td>
+                    <td className="px-5 py-3 text-sm font-mono text-muted-foreground">{s.lost}</td>
+                    <td className="px-5 py-3 text-sm font-mono text-foreground">{s.active}</td>
+                    <td className="px-5 py-3">
                       <div className="flex items-center gap-2.5">
-                        <div className="h-2 w-20 bg-border/40 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full gradient-primary" style={{ width: `${Math.min(s.conversionRate, 100)}%` }} />
+                        <div className="h-2 w-20 overflow-hidden rounded-full bg-border/40">
+                          <div className="h-full rounded-full bg-slate-900" style={{ width: `${Math.min(s.conversionRate, 100)}%` }} />
                         </div>
                         <span className="text-xs font-mono font-medium text-foreground whitespace-nowrap">{s.conversionRate.toFixed(1)}%</span>
                       </div>
                     </td>
-                    <td className="px-5 py-3 text-sm font-mono text-foreground border-b border-border/15 whitespace-nowrap">{s.closeRate.toFixed(1)}%</td>
-                    <td className="px-5 py-3 text-sm font-mono text-muted-foreground border-b border-border/15">{s.avgFollowUps.toFixed(1)}</td>
-                    <td className="px-5 py-3 text-sm font-mono text-foreground border-b border-border/15">{s.scheduledFollowUps}</td>
-                    <td className="px-5 py-3 text-sm font-mono text-foreground border-b border-border/15">{s.avgVisits.toFixed(1)}</td>
-                    <td className="px-5 py-3 text-sm font-mono text-foreground border-b border-border/15 whitespace-nowrap">{formatCompactIndianCurrency(s.avgLtv)}</td>
-                    <td className="px-5 py-3 text-sm font-mono text-foreground border-b border-border/15">{s.centersCovered}</td>
-                    <td className={`px-5 py-3 text-sm font-mono border-b border-border/15 ${s.overdueFollowUps > 0 ? 'text-accent-overdue font-semibold' : 'text-muted-foreground'}`}>
-                      {s.overdueFollowUps > 0 && <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent-overdue mr-1.5 animate-pulse-overdue" />}
+                    <td className="px-5 py-3 text-sm font-mono text-foreground whitespace-nowrap">{s.closeRate.toFixed(1)}%</td>
+                    <td className="px-5 py-3 text-sm font-mono text-muted-foreground">{s.avgFollowUps.toFixed(1)}</td>
+                    <td className="px-5 py-3 text-sm font-mono text-foreground">{s.scheduledFollowUps}</td>
+                    <td className="px-5 py-3 text-sm font-mono text-foreground">{s.avgVisits.toFixed(1)}</td>
+                    <td className="px-5 py-3 text-sm font-mono text-foreground whitespace-nowrap">{formatCompactIndianCurrency(s.avgLtv)}</td>
+                    <td className="px-5 py-3 text-sm font-mono text-foreground">{s.centersCovered}</td>
+                    <td className={`px-5 py-3 text-sm font-mono ${s.overdueFollowUps > 0 ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+                      {s.overdueFollowUps > 0 && <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-slate-900" />}
                       {s.overdueFollowUps}
                     </td>
-                    <td className="px-5 py-3 text-sm font-mono text-foreground font-medium border-b border-border/15 whitespace-nowrap">{formatCompactIndianCurrency(s.totalLtv)}</td>
-                    <td className="px-5 py-3 border-b border-border/15">
+                    <td className="px-5 py-3 text-sm font-mono font-medium text-foreground whitespace-nowrap">{formatCompactIndianCurrency(s.totalLtv)}</td>
+                    <td className="px-5 py-3">
                       <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${expandedAssociate === s.name ? 'rotate-90' : ''}`} />
                     </td>
                   </tr>
@@ -188,16 +188,16 @@ export function AssociateOverview({ leads, allLeads, options }: Props) {
                   {expandedAssociate === s.name && (
                     <tr>
                       <td colSpan={14} className="p-0 border-b border-border/15">
-                        <div className="bg-primary/[0.02] px-5 py-3">
+                        <div className="bg-slate-950/[0.04] px-5 py-3">
                           <p className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground mb-2">
                             {s.name}'s Leads ({associateLeads.length})
                           </p>
                           <div className="overflow-x-auto rounded-xl border border-border/30 bg-background/50">
-                            <table className="w-full">
-                              <thead>
-                                <tr className="gradient-subtle">
+                            <table className="w-full border-separate border-spacing-0">
+                              <thead className="lead-table-head">
+                                <tr className="lead-table-header">
                                   {['Name', 'Date', 'Stage', 'Status', 'Source', 'Remarks', 'LTV'].map(h => (
-                                    <th key={h} className="h-9 px-4 text-left text-[10px] uppercase tracking-wider font-semibold text-muted-foreground border-b border-border/30 whitespace-nowrap">{h}</th>
+                                    <th key={h} className="h-10 px-4 text-left text-[10px] uppercase tracking-wider font-semibold text-slate-300 whitespace-nowrap">{h}</th>
                                   ))}
                                 </tr>
                               </thead>
@@ -206,9 +206,9 @@ export function AssociateOverview({ leads, allLeads, options }: Props) {
                                   <tr
                                     key={lead.id}
                                     onClick={(e) => { e.stopPropagation(); setSelectedLead(lead); }}
-                                    className="cursor-pointer hover:bg-primary/[0.03] transition-colors"
+                                    className="cursor-pointer border-b border-border/20 bg-white/75 transition-colors duration-150 odd:bg-background/88 even:bg-slate-50/78 hover:bg-slate-100"
                                   >
-                                    <td className="px-4 py-2.5 border-b border-border/15">
+                                    <td className="px-4 py-2.5">
                                       <HoverCard openDelay={120} closeDelay={120}>
                                         <HoverCardTrigger asChild>
                                           <span className="text-sm font-medium text-foreground whitespace-nowrap cursor-default">{lead.fullName}</span>
@@ -218,14 +218,14 @@ export function AssociateOverview({ leads, allLeads, options }: Props) {
                                         </HoverCardContent>
                                       </HoverCard>
                                     </td>
-                                    <td className="px-4 py-2.5 text-xs text-muted-foreground font-mono border-b border-border/15 whitespace-nowrap">{lead.createdAt}</td>
-                                    <td className="px-4 py-2.5 border-b border-border/15"><LeadStageBadge label={lead.stageName} className="min-w-[128px]" /></td>
-                                    <td className="px-4 py-2.5 border-b border-border/15"><LeadStatusBadge label={lead.status} className="min-w-[112px]" /></td>
-                                    <td className="px-4 py-2.5 border-b border-border/15"><LeadSourceBadge label={lead.sourceName} className="min-w-[128px]" /></td>
-                                    <td className="px-4 py-2.5 border-b border-border/15">
+                                    <td className="px-4 py-2.5 text-xs text-muted-foreground font-mono whitespace-nowrap">{lead.createdAt}</td>
+                                    <td className="px-4 py-2.5 text-xs font-semibold text-foreground whitespace-nowrap">{lead.stageName}</td>
+                                    <td className="px-4 py-2.5 text-xs text-foreground whitespace-nowrap">{lead.status}</td>
+                                    <td className="px-4 py-2.5 text-xs text-foreground whitespace-nowrap">{lead.sourceName}</td>
+                                    <td className="px-4 py-2.5">
                                       <span className="text-[11px] text-muted-foreground truncate block max-w-[180px] cursor-default">{lead.remarks && lead.remarks !== '-' ? lead.remarks : '—'}</span>
                                     </td>
-                                    <td className="px-4 py-2.5 text-xs font-mono text-foreground font-medium border-b border-border/15 whitespace-nowrap">
+                                    <td className="px-4 py-2.5 text-xs font-mono text-foreground font-medium whitespace-nowrap">
                                       {lead.ltv > 0 ? `₹${lead.ltv.toLocaleString()}` : '—'}
                                     </td>
                                   </tr>

@@ -30,7 +30,7 @@ const datePresets: { key: DatePreset; label: string }[] = [
 ];
 
 export function LeadFilters({ filters, onChange, leads }: Props) {
-  const [quickExpanded, setQuickExpanded] = useState(true);
+  const [quickExpanded, setQuickExpanded] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
   const activeCount = Object.entries(filters).filter(([k, v]) => {
@@ -86,11 +86,6 @@ export function LeadFilters({ filters, onChange, leads }: Props) {
         >
           <SlidersHorizontal className="h-4 w-4" />
           Filters
-          {activeCount > 0 && (
-            <span className="ml-1 h-5 min-w-[20px] px-1.5 flex items-center justify-center text-[10px] font-semibold rounded-full gradient-primary text-primary-foreground">
-              {activeCount}
-            </span>
-          )}
           {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
         </Button>
         {activeCount > 0 && (
